@@ -1,5 +1,6 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import audioType, { type AudioFormat } from "audio-type";
+import { sniffAudioMime } from "./audio-mime";
+import { base64ToBlob } from "./base64-blob";
 
 const fileInfoEl = document.querySelector("#file-info") as HTMLElement;
 
@@ -56,53 +57,4 @@ async function loadAudioBlob(
     console.log(`Decoded base64 to blob in ${(performance.now() - strt).toFixed(2)} ms`);
     base64 = null;
     return blob;
-}
-
-const SNIFF_BASE64_CHARS = 88; // 88 base64 chars → 66 bytes, ≥ 64 required by audio-type
-
-const FORMAT_MIME: Record<AudioFormat, string> = {
-    wav: "audio/wav",
-    aiff: "audio/aiff",
-    mp3: "audio/mpeg",
-    aac: "audio/aac",
-    flac: "audio/flac",
-    m4a: "audio/mp4",
-    opus: "audio/ogg",
-    oga: "audio/ogg",
-    qoa: "audio/qoa",
-    mid: "audio/midi",
-    caf: "audio/x-caf",
-    wma: "audio/x-ms-wma",
-    amr: "audio/amr",
-    webm: "audio/webm",
-};
-
-function sniffAudioMime(base64: string): string {
-    const headLen = Math.min(base64.length, SNIFF_BASE64_CHARS);
-    const aligned = headLen - (headLen % 4);
-    if (aligned < 4) return "application/octet-stream";
-    const head = Uint8Array.fromBase64(base64.slice(0, aligned));
-    const fmt = audioType(head);
-    return fmt ? FORMAT_MIME[fmt] : "application/octet-stream";
-}
-
-const CHUNK_BASE64 = 1 << 20;       // 1 MiB; multiple of 4 → no padding split
-const YIELD_EVERY_CHUNKS = 16;      // ~16 MiB of base64 between yields
-
-async function base64ToBlob(
-    base64: string,
-    type: string,
-    stillCurrent: () => boolean,
-): Promise<Blob | null> {
-    const parts: Blob[] = [];
-    let chunkIdx = 0;
-    for (let pos = 0; pos < base64.length; pos += CHUNK_BASE64) {
-        if (!stillCurrent()) return null;
-        const bytes = Uint8Array.fromBase64(base64.slice(pos, pos + CHUNK_BASE64));
-        parts.push(new Blob([bytes]));
-        if (++chunkIdx % YIELD_EVERY_CHUNKS === 0) {
-            await new Promise<void>(r => setTimeout(r));
-        }
-    }
-    return new Blob(parts, { type });
 }
