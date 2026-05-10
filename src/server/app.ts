@@ -1,5 +1,7 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
 import {
   registerAppTool,
   registerAppResource,
@@ -20,10 +22,10 @@ registerAppTool(
   server,
   "display-audio-file",
   {
-    title: "Display aufio file",
+    title: "Display audio file",
     description: "Display a UI for an audio file, providing the user with playback, metadata, and statistics",
     inputSchema: z.object({
-       path: z.string().describe("Path to the local audio file to display")
+       path: z.string().describe("Absolute path to a local audio file")
     }),
     _meta: { ui: { resourceUri } },
   },
@@ -50,6 +52,34 @@ registerAppResource(
       ],
     };
   },
+);
+
+server.registerResource(
+    "audiofile",
+    new ResourceTemplate("audiofile://{path}", {list: undefined}),
+    {
+        description: "Audio file served as MCP resource (base64 blob)",
+        mimeType: "application/octet-stream",
+    },
+    async (uri, { path }): Promise<ReadResourceResult> => {
+        const pathStrRaw = Array.isArray(path) ? path[0] : path;
+        if (!pathStrRaw) {
+            throw new Error("Path parameter is required");
+        }
+        const pathStr = decodeURIComponent(pathStrRaw);
+        const exists = await fs.stat(pathStr).then(() => true).catch(() => false);
+        if (!exists) {
+            throw new Error(`File not found: ${pathStr}`);
+        }
+        console.error("[audiofile resource] Serving file:", pathStr);
+        const data = await fs.readFile(pathStr, { encoding: "base64" });
+        console.error("[audiofile resource] File size (base64):", data.length);
+        return {
+            contents: [
+                { uri: uri.href, mimeType: "application/octet-stream", blob: data },
+            ],
+        };
+    }
 );
 
 
