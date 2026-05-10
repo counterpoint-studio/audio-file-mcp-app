@@ -13,3 +13,14 @@ body {
     box-sizing: border-box;
     overflow: hidden;
 }
+
+#play-pause {
+    margin: 0.5rem;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+}
+
+#play-pause:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}

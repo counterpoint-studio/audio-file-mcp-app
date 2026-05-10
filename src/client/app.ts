@@ -2,13 +2,15 @@ import "./app.css";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { sniffAudioMime } from "./audio-mime";
 import { base64ToBlob } from "./base64-blob";
+import { createPlayer, type Player } from "./player";
 
 const fileInfoEl = document.querySelector("#file-info") as HTMLElement;
+const playPauseBtn = document.querySelector("#play-pause") as HTMLButtonElement;
 
 const app = new App({ name: "Audio File App", version: "1.0.0" });
 app.connect();
 
-type AudioState = { path: string; blob: Blob; url: string };
+type AudioState = { path: string; blob: Blob; url: string; player: Player };
 
 let currentAudio: AudioState | null = null;
 let loadGen = 0;
@@ -24,12 +26,14 @@ app.ontoolresult = async (result) => {
     if (myGen !== loadGen || blob === null) return;
 
     const url = URL.createObjectURL(blob);
-    currentAudio = { path: filePath, blob, url };
+    const player = createPlayer(url, playPauseBtn);
+    currentAudio = { path: filePath, blob, url, player };
     fileInfoEl.textContent = `File: ${filePath}, type: ${blob.type}, size: ${blob.size} bytes`;
 };
 
 function releaseCurrent(): void {
     if (currentAudio) {
+        currentAudio.player.destroy();
         URL.revokeObjectURL(currentAudio.url);
         currentAudio = null;
     }
