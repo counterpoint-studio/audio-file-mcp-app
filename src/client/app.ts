@@ -1,3 +1,4 @@
+import "./app.css";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { sniffAudioMime } from "./audio-mime";
 import { base64ToBlob } from "./base64-blob";
