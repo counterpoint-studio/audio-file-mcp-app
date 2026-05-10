@@ -1,0 +1,30 @@
+{
+  "name": "@counterpoint-studio/audio-file-mcp-app",
+  "version": "1.0.0",
+  "description": "An MCP app for inspecting audio files in audio workflows. Playback, metadata, statistics",
+  "keywords": [
+    "audio",
+    "mcp"
+  ],
+  "license": "ISC",
+  "author": "Tero Parviainen <tero@teropa.info>",
+  "type": "module",
+  "scripts": {
+    "build": "INPUT=mcp-app.html vite build",
+    "serve": "npx tsx src/server/app.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.1",
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.11",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
