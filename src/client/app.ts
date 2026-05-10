@@ -1,6 +1,11 @@
 import "./app.css";
 import { App } from "@modelcontextprotocol/ext-apps";
-import { sniffAudioMime } from "./audio-mime";
+import {
+    sniffAudioFormat,
+    audioFormatToMime,
+    audioFormatToDecodeFormat,
+    type AudioDecodeFormat,
+} from "./audio-formats";
 import { base64ToBlob } from "./base64-blob";
 import { createPlayer, type Player } from "./player";
 
@@ -12,6 +17,7 @@ const app = new App({ name: "Audio File App", version: "1.0.0" });
 app.connect();
 
 type AudioState = { path: string; blob: Blob; url: string; player: Player };
+type LoadedAudio = { blob: Blob; decodeFormat: AudioDecodeFormat | null };
 
 let currentAudio: AudioState | null = null;
 let loadGen = 0;
@@ -23,11 +29,12 @@ app.ontoolresult = async (result) => {
     const myGen = ++loadGen;
     releaseCurrent();
 
-    const blob = await loadAudioBlob(filePath, () => myGen === loadGen);
-    if (myGen !== loadGen || blob === null) return;
+    const loaded = await loadAudio(filePath, () => myGen === loadGen);
+    if (myGen !== loadGen || loaded === null) return;
 
+    const { blob, decodeFormat } = loaded;
     const url = URL.createObjectURL(blob);
-    const player = createPlayer(url, playPauseBtn, seekBarEl);
+    const player = createPlayer(url, blob, decodeFormat, playPauseBtn, seekBarEl);
     currentAudio = { path: filePath, blob, url, player };
     fileInfoEl.textContent = `File: ${filePath}, type: ${blob.type}, size: ${blob.size} bytes`;
 };
@@ -40,10 +47,10 @@ function releaseCurrent(): void {
     }
 }
 
-async function loadAudioBlob(
+async function loadAudio(
     filePath: string,
     stillCurrent: () => boolean,
-): Promise<Blob | null> {
+): Promise<LoadedAudio | null> {
     const uri = `audiofile://${encodeURIComponent(filePath)}`;
     let resourceResult: Awaited<ReturnType<typeof app.readServerResource>> | null =
         await app.readServerResource({ uri });
@@ -57,10 +64,13 @@ async function loadAudioBlob(
     let base64: string | null = content.blob;
     resourceResult = null;
 
-    const mime = sniffAudioMime(base64);
+    const format = sniffAudioFormat(base64);
+    const mime = audioFormatToMime(format);
+    const decodeFormat = audioFormatToDecodeFormat(format);
     const strt = performance.now();
     const blob = await base64ToBlob(base64, mime, stillCurrent);
     console.log(`Decoded base64 to blob in ${(performance.now() - strt).toFixed(2)} ms`);
     base64 = null;
-    return blob;
+    if (blob === null) return null;
+    return { blob, decodeFormat };
 }

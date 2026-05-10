@@ -1,4 +1,6 @@
+import { type AudioDecodeFormat } from "./audio-formats";
 import { createSeekBar, type SeekBar } from "./seek-bar";
+import { createWaveform, type Waveform } from "./waveform";
 
 export type Player = {
     destroy(): void;
@@ -6,6 +8,8 @@ export type Player = {
 
 export function createPlayer(
     url: string,
+    blob: Blob,
+    decodeFormat: AudioDecodeFormat | null,
     button: HTMLButtonElement,
     seekBarEl: HTMLElement,
 ): Player {
@@ -13,6 +17,7 @@ export function createPlayer(
     audio.preload = "auto";
 
     const seekBar: SeekBar = createSeekBar(audio, seekBarEl);
+    const waveform: Waveform = createWaveform(blob, decodeFormat, audio, seekBarEl);
 
     const onClick = () => {
         if (audio.paused) {
@@ -39,6 +44,9 @@ export function createPlayer(
 
     return {
         destroy() {
+            // Tear down render layers (which may still hold the blob) before
+            // the audio detaches and the URL is revoked.
+            waveform.destroy();
             seekBar.destroy();
             button.removeEventListener("click", onClick);
             audio.removeEventListener("play", onPlay);
