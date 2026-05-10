@@ -1,10 +1,18 @@
+import { createSeekBar, type SeekBar } from "./seek-bar";
+
 export type Player = {
     destroy(): void;
 };
 
-export function createPlayer(url: string, button: HTMLButtonElement): Player {
+export function createPlayer(
+    url: string,
+    button: HTMLButtonElement,
+    seekBarEl: HTMLElement,
+): Player {
     const audio = new Audio(url);
     audio.preload = "auto";
+
+    const seekBar: SeekBar = createSeekBar(audio, seekBarEl);
 
     const onClick = () => {
         if (audio.paused) {
@@ -31,6 +39,7 @@ export function createPlayer(url: string, button: HTMLButtonElement): Player {
 
     return {
         destroy() {
+            seekBar.destroy();
             button.removeEventListener("click", onClick);
             audio.removeEventListener("play", onPlay);
             audio.removeEventListener("pause", onPause);

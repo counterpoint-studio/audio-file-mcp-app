@@ -6,6 +6,7 @@ import { createPlayer, type Player } from "./player";
 
 const fileInfoEl = document.querySelector("#file-info") as HTMLElement;
 const playPauseBtn = document.querySelector("#play-pause") as HTMLButtonElement;
+const seekBarEl = document.querySelector("#seek-bar") as HTMLElement;
 
 const app = new App({ name: "Audio File App", version: "1.0.0" });
 app.connect();
@@ -26,7 +27,7 @@ app.ontoolresult = async (result) => {
     if (myGen !== loadGen || blob === null) return;
 
     const url = URL.createObjectURL(blob);
-    const player = createPlayer(url, playPauseBtn);
+    const player = createPlayer(url, playPauseBtn, seekBarEl);
     currentAudio = { path: filePath, blob, url, player };
     fileInfoEl.textContent = `File: ${filePath}, type: ${blob.type}, size: ${blob.size} bytes`;
 };

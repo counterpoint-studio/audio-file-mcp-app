@@ -6,7 +6,12 @@
   </head>
   <body>
     <p id="file-info"></p>
-    <button id="play-pause" type="button" disabled>Play</button>
+    <div id="transport">
+      <button id="play-pause" type="button" disabled>Play</button>
+      <div id="seek-bar">
+        <div id="playhead"></div>
+      </div>
+    </div>
     <script type="module" src="/src/client/app.ts"></script>
   </body>
 </html>
