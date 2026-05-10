@@ -1,16 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   registerAppTool,
   registerAppResource,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
-import cors from "cors";
-import express from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
-
-console.log("Starting audio file MCP app server...");
 
 const server = new McpServer({
   name: "Audio File MCP App",
@@ -30,7 +26,7 @@ registerAppTool(
   },
   async () => {
     return {
-      content: [{ type: "text", text: "Hello" }],
+      content: [{ type: "text", text: "Hello: " + Math.round(Math.random() * 1000) }],
     };
   },
 );
@@ -53,24 +49,10 @@ registerAppResource(
   },
 );
 
-const expressApp = express();
-expressApp.use(cors());
-expressApp.use(express.json());
 
-expressApp.post("/mcp", async (req, res) => {
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
-  });
-  res.on("close", () => transport.close());
-  await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
-});
+async function main() {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+}
 
-expressApp.listen(3001, (err) => {
-  if (err) {
-    console.error("Error starting server:", err);
-    process.exit(1);
-  }
-  console.log("Server listening on http://localhost:3001/mcp");
-});
+main();
