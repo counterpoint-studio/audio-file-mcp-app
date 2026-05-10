@@ -7,6 +7,7 @@ import {
 } from "@modelcontextprotocol/ext-apps/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import * as z from "zod";
 
 const server = new McpServer({
   name: "Audio File MCP App",
@@ -17,16 +18,18 @@ const resourceUri = "ui://ctpt.co/audio-file/mcp-app.html";
 
 registerAppTool(
   server,
-  "say-hello",
+  "display-audio-file",
   {
-    title: "Say Hello",
-    description: "A tool for testing",
-    inputSchema: {},
+    title: "Display aufio file",
+    description: "Display a UI for an audio file, providing the user with playback, metadata, and statistics",
+    inputSchema: z.object({
+       path: z.string().describe("Path to the local audio file to display")
+    }),
     _meta: { ui: { resourceUri } },
   },
-  async () => {
+  async ({ path }) => {
     return {
-      content: [{ type: "text", text: "Hello: " + Math.round(Math.random() * 1000) }],
+      content: [{ type: "text", text: path }],
     };
   },
 );

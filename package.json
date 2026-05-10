@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.7.1",
-    "@modelcontextprotocol/sdk": "^1.29.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "tsx": "^4.21.0",
