@@ -5,6 +5,7 @@ export type SeekBar = {
 export function createSeekBar(
     audio: HTMLAudioElement,
     seekBarEl: HTMLElement,
+    onProgress?: (progress: number) => void,
 ): SeekBar {
     let rafId = 0;
     let pendingSeekTimer: ReturnType<typeof setTimeout> | null = null;
@@ -13,6 +14,7 @@ export function createSeekBar(
 
     const setProgress = (p: number) => {
         seekBarEl.style.setProperty("--progress", String(p));
+        onProgress?.(p);
     };
 
     const cancelPendingSeek = () => {

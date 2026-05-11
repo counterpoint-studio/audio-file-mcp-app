@@ -1,5 +1,6 @@
 import { type AudioDecodeFormat } from "./audio-formats";
 import { createSeekBar, type SeekBar } from "./seek-bar";
+import { createTimeDisplay, type TimeDisplay } from "./time-display";
 import { createWaveform, type Waveform } from "./waveform";
 
 export type Player = {
@@ -12,11 +13,14 @@ export function createPlayer(
     decodeFormat: AudioDecodeFormat | null,
     button: HTMLButtonElement,
     seekBarEl: HTMLElement,
+    positionEl: HTMLElement,
+    durationEl: HTMLElement,
 ): Player {
     const audio = new Audio(url);
     audio.preload = "auto";
 
-    const seekBar: SeekBar = createSeekBar(audio, seekBarEl);
+    const timeDisplay: TimeDisplay = createTimeDisplay(audio, positionEl, durationEl);
+    const seekBar: SeekBar = createSeekBar(audio, seekBarEl, timeDisplay.update);
     const waveform: Waveform = createWaveform(blob, decodeFormat, audio, seekBarEl);
 
     const onClick = () => {
@@ -48,6 +52,7 @@ export function createPlayer(
             // the audio detaches and the URL is revoked.
             waveform.destroy();
             seekBar.destroy();
+            timeDisplay.destroy();
             button.removeEventListener("click", onClick);
             audio.removeEventListener("play", onPlay);
             audio.removeEventListener("pause", onPause);

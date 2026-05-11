@@ -8,9 +8,14 @@
     <p id="file-info"></p>
     <div id="transport">
       <button id="play-pause" type="button" disabled>Play</button>
-      <div id="seek-bar">
-        <canvas id="waveform"></canvas>
-        <div id="playhead"></div>
+      <div id="seek-stack">
+        <div id="time-display">
+          <span id="position">00:00:00.000</span> / <span id="duration">00:00:00.000</span>
+        </div>
+        <div id="seek-bar">
+          <canvas id="waveform"></canvas>
+          <div id="playhead"></div>
+        </div>
       </div>
     </div>
     <script type="module" src="/src/client/app.ts"></script>
