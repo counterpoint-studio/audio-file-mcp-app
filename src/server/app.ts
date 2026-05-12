@@ -25,7 +25,7 @@ registerAppTool(
     title: "Display audio file",
     description: "Display a UI for an audio file, providing the user with playback, metadata, and statistics. Use when the user specifically asks to hear or see an audio file, or when otherwise clear from context that one would be helpful.",
     inputSchema: z.object({
-       path: z.string().describe("Absolute path to a local audio file")
+       path: z.string().describe("Absolute path to an audio file on the user's machine")
     }),
     _meta: { ui: { resourceUri } },
   },

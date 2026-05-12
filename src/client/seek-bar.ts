@@ -8,30 +8,12 @@ export function createSeekBar(
     onProgress?: (progress: number) => void,
 ): SeekBar {
     let rafId = 0;
-    let pendingSeekTimer: ReturnType<typeof setTimeout> | null = null;
-    let pendingSeekProgress: number | null = null;
     let scrubbing = false;
+    let wasPlayingBeforeScrub = false;
 
     const setProgress = (p: number) => {
         seekBarEl.style.setProperty("--progress", String(p));
         onProgress?.(p);
-    };
-
-    const cancelPendingSeek = () => {
-        if (pendingSeekTimer !== null) {
-            clearTimeout(pendingSeekTimer);
-            pendingSeekTimer = null;
-        }
-        pendingSeekProgress = null;
-    };
-
-    const flushPendingSeek = () => {
-        const p = pendingSeekProgress;
-        cancelPendingSeek();
-        if (p === null) return;
-        const { duration } = audio;
-        if (!Number.isFinite(duration) || duration <= 0) return;
-        audio.currentTime = p * duration;
     };
 
     const tick = () => {
@@ -71,22 +53,8 @@ export function createSeekBar(
         const { duration } = audio;
         if (!Number.isFinite(duration) || duration <= 0) return;
         const p = pointerToProgress(e);
-        cancelPendingSeek();
         audio.currentTime = p * duration;
         setProgress(p);
-    };
-
-    const seekToPointerDebounced = (e: PointerEvent) => {
-        const { duration } = audio;
-        if (!Number.isFinite(duration) || duration <= 0) return;
-        const p = pointerToProgress(e);
-        setProgress(p);
-        pendingSeekProgress = p;
-        if (pendingSeekTimer !== null) clearTimeout(pendingSeekTimer);
-        pendingSeekTimer = setTimeout(() => {
-            pendingSeekTimer = null;
-            flushPendingSeek();
-        }, 40);
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -95,23 +63,25 @@ export function createSeekBar(
         if (!Number.isFinite(duration) || duration <= 0) return;
         seekBarEl.setPointerCapture(e.pointerId);
         scrubbing = true;
+        wasPlayingBeforeScrub = !audio.paused;
+        if (wasPlayingBeforeScrub) audio.pause();
         seekToPointerImmediate(e);
-        if (audio.paused) {
-            void audio.play();
-        }
     };
 
     const onPointerMove = (e: PointerEvent) => {
         if (!seekBarEl.hasPointerCapture(e.pointerId)) return;
-        seekToPointerDebounced(e);
+        seekToPointerImmediate(e);
     };
 
     const onPointerUpOrCancel = (e: PointerEvent) => {
         if (seekBarEl.hasPointerCapture(e.pointerId)) {
             seekBarEl.releasePointerCapture(e.pointerId);
         }
-        flushPendingSeek();
         scrubbing = false;
+        if (wasPlayingBeforeScrub) {
+            wasPlayingBeforeScrub = false;
+            void audio.play();
+        }
     };
 
     audio.addEventListener("play", onPlay);
@@ -126,8 +96,8 @@ export function createSeekBar(
     return {
         destroy() {
             stopRaf();
-            cancelPendingSeek();
             scrubbing = false;
+            wasPlayingBeforeScrub = false;
             audio.removeEventListener("play", onPlay);
             audio.removeEventListener("pause", onPause);
             seekBarEl.removeEventListener("pointerdown", onPointerDown);
