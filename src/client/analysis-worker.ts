@@ -4,8 +4,10 @@ export {};
 
 import decode, { type DecodedChunk } from "audio-decode";
 import { AnalysisPipeline } from "./analysis/pipeline";
+import { FrameRouter } from "./analysis/frame-router";
 import { LoudnessAnalyzer, type LoudnessSummary } from "./analysis/loudness";
 import { SampleStatsAnalyzer } from "./analysis/sample-stats";
+import { SpectrogramAnalyzer } from "./analysis/spectrogram";
 import { TimeSeriesStore } from "./analysis/time-series";
 import { WaveformPeaksAnalyzer } from "./analysis/waveform-peaks";
 import {
@@ -31,11 +33,32 @@ type ResizeMsg = {
     dpr: number;
 };
 
+type SpectrogramCanvasMsg = {
+    type: "spectrogram-canvas";
+    canvas: OffscreenCanvas;
+    cssWidth: number;
+    cssHeight: number;
+    dpr: number;
+};
+
+type SpectrogramResizeMsg = {
+    type: "spectrogram-resize";
+    cssWidth: number;
+    cssHeight: number;
+    dpr: number;
+};
+
 type DurationMsg = { type: "duration"; seconds: number };
 
 type QueryAtMsg = { type: "queryAt"; id: number; seconds: number };
 
-type InMsg = InitMsg | ResizeMsg | DurationMsg | QueryAtMsg;
+type InMsg =
+    | InitMsg
+    | ResizeMsg
+    | SpectrogramCanvasMsg
+    | SpectrogramResizeMsg
+    | DurationMsg
+    | QueryAtMsg;
 
 const LIVE_INTERVAL_MS = 250;
 
@@ -43,7 +66,15 @@ const timeSeries = new TimeSeriesStore();
 const waveform = new WaveformPeaksAnalyzer();
 const sampleStats = new SampleStatsAnalyzer(timeSeries);
 const loudness = new LoudnessAnalyzer(timeSeries);
-const pipeline = new AnalysisPipeline([waveform, sampleStats, loudness]);
+const spectrogram = new SpectrogramAnalyzer();
+const frameRouter = new FrameRouter([spectrogram]);
+const pipeline = new AnalysisPipeline([
+    waveform,
+    sampleStats,
+    loudness,
+    frameRouter,
+    spectrogram,
+]);
 const dspReady = instantiateDsp();
 let loudnessSummary: LoudnessSummary | null = null;
 let decodeAbort = false;
@@ -64,8 +95,20 @@ self.onmessage = (e: MessageEvent<InMsg>) => {
         case "resize":
             waveform.resize(msg.cssWidth, msg.cssHeight, msg.dpr);
             break;
+        case "spectrogram-canvas":
+            spectrogram.setCanvas(
+                msg.canvas,
+                msg.cssWidth,
+                msg.cssHeight,
+                msg.dpr,
+            );
+            break;
+        case "spectrogram-resize":
+            spectrogram.resize(msg.cssWidth, msg.cssHeight, msg.dpr);
+            break;
         case "duration":
             waveform.setDuration(msg.seconds);
+            spectrogram.setDuration(msg.seconds);
             break;
         case "queryAt":
             handleQueryAt(msg.id, msg.seconds);

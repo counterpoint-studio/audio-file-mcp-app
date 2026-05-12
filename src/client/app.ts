@@ -14,6 +14,7 @@ const playPauseBtn = document.querySelector("#play-pause") as HTMLButtonElement;
 const seekBarEl = document.querySelector("#seek-bar") as HTMLElement;
 const positionEl = document.querySelector("#position") as HTMLElement;
 const durationEl = document.querySelector("#duration") as HTMLElement;
+const spectrogramWrapEl = document.querySelector("#spectrogram-wrap") as HTMLElement;
 
 const app = new App({ name: "Audio File App", version: "1.0.0" });
 app.connect();
@@ -44,6 +45,7 @@ app.ontoolresult = async (result) => {
         seekBarEl,
         positionEl,
         durationEl,
+        spectrogramWrapEl,
     );
     currentAudio = { path: filePath, blob, url, player };
     fileInfoEl.textContent = `File: ${filePath}, type: ${blob.type}, size: ${blob.size} bytes`;

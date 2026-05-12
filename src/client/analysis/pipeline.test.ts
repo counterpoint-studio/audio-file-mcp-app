@@ -122,4 +122,38 @@ describe("AnalysisPipeline", () => {
         p.feed(chunk(100, 1));
         expect(a.initCalls[0].numChannels).toBe(1);
     });
+
+    it("skips chunks with zero channels or zero frames", () => {
+        const a = recordingAnalyzer();
+        const p = new AnalysisPipeline([a]);
+        p.feed({ sampleRate: 44100, channelData: [] });
+        p.feed({ sampleRate: 44100, channelData: [new Float32Array(0)] });
+        expect(a.initCalls).toHaveLength(0);
+        expect(a.feedCalls).toHaveLength(0);
+        expect(p.totalSamples).toBe(0);
+    });
+
+    it("coerces a later chunk's channel count to match the initial chunk (mono after stereo duplicates the mono channel)", () => {
+        const a = recordingAnalyzer();
+        const p = new AnalysisPipeline([a]);
+        p.feed(chunk(100, 2));
+        const monoSamples = new Float32Array(100);
+        monoSamples[0] = 0.5;
+        p.feed({ sampleRate: 44100, channelData: [monoSamples] });
+        expect(a.initCalls[0].numChannels).toBe(2);
+        expect(a.feedCalls).toHaveLength(2);
+        const second = a.feedCalls[1];
+        expect(second.channelData).toHaveLength(2);
+        expect(second.channelData[0]).toBe(monoSamples);
+        expect(second.channelData[1]).toBe(monoSamples);
+        expect(p.totalSamples).toBe(200);
+    });
+
+    it("truncates extra channels in a later chunk to match the initial channel count", () => {
+        const a = recordingAnalyzer();
+        const p = new AnalysisPipeline([a]);
+        p.feed(chunk(50, 1));
+        p.feed(chunk(50, 3));
+        expect(a.feedCalls[1].channelData).toHaveLength(1);
+    });
 });
