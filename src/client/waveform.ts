@@ -1,4 +1,4 @@
-import WaveformWorker from "./waveform-worker.ts?worker&inline";
+import WaveformWorker from "./analysis-worker.ts?worker&inline";
 import { type AudioDecodeFormat } from "./audio-formats";
 
 export type Waveform = { destroy(): void };
