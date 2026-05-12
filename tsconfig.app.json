@@ -11,5 +11,5 @@
     "composite": true
   },
   "include": ["src/client/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "src/**/__fixtures__/**"]
 }

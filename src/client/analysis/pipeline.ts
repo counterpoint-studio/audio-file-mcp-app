@@ -45,6 +45,14 @@ export class AnalysisPipeline {
         return this.decodedSamples;
     }
 
+    get numChannelsObserved(): number {
+        return this.numChannels;
+    }
+
+    get sampleRateObserved(): number {
+        return this.sampleRate;
+    }
+
     // Coerce a chunk's channel layout to the count we initialized with.
     // audio-decode collapses stereo→mono per chunk when L≡R at every 37th
     // sample (see audio-decode.js norm()), so a real stereo file can flicker

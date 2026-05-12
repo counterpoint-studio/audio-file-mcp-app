@@ -62,6 +62,18 @@ type InMsg =
 
 const LIVE_INTERVAL_MS = 250;
 
+let decoderInfoSent = false;
+function maybePostDecoderInfo(): void {
+    if (decoderInfoSent) return;
+    if (pipeline.totalSamples <= 0) return;
+    decoderInfoSent = true;
+    self.postMessage({
+        type: "decoder-info",
+        channels: pipeline.numChannelsObserved,
+        sampleRate: pipeline.sampleRateObserved,
+    });
+}
+
 const timeSeries = new TimeSeriesStore();
 const waveform = new WaveformPeaksAnalyzer();
 const sampleStats = new SampleStatsAnalyzer(timeSeries);
@@ -139,6 +151,7 @@ async function runStreaming(
     for await (const chunk of decoder(stream)) {
         if (decodeAbort) return;
         pipeline.feed(chunk);
+        maybePostDecoderInfo();
         maybePostLive();
     }
 }
@@ -162,6 +175,7 @@ async function startDecode(
             const result = await wholeFileDecoder(format)(buf);
             if (decodeAbort) return;
             pipeline.feed(result);
+            maybePostDecoderInfo();
             maybePostLive();
         }
         pipeline.finalize();

@@ -9,7 +9,7 @@ body {
        height back to the host via the SDK's autoResize. Bump the height as
        features (transport, waveform, meters) land. */
     width: 100%;
-    height: 320px;
+    height: 380px;
     box-sizing: border-box;
     overflow: hidden;
     display: flex;
@@ -156,4 +156,33 @@ body {
 #metrics dd {
     margin: 0;
     font-variant-numeric: tabular-nums;
+}
+
+#metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 1rem;
+    margin: 0;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.78rem;
+    font-family: ui-monospace, monospace;
+}
+
+#metadata > div {
+    display: flex;
+    gap: 0.3rem;
+}
+
+#metadata > div[hidden] {
+    display: none;
+}
+
+#metadata dt {
+    color: #777;
+}
+
+#metadata dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    word-break: break-all;
 }

@@ -5,11 +5,14 @@ import {
     audioFormatToMime,
     audioFormatToDecodeFormat,
     type AudioDecodeFormat,
+    type AudioFormat,
 } from "./audio-formats";
 import { base64ToBlob } from "./base64-blob";
 import { createPlayer, type Player } from "./player";
+import { extractMetadata } from "./metadata";
+import { createMetadataDisplay, type MetadataDisplay } from "./metadata-display";
 
-const fileInfoEl = document.querySelector("#file-info") as HTMLElement;
+const metadataEl = document.querySelector("#metadata") as HTMLElement;
 const playPauseBtn = document.querySelector("#play-pause") as HTMLButtonElement;
 const seekBarEl = document.querySelector("#seek-bar") as HTMLElement;
 const positionEl = document.querySelector("#position") as HTMLElement;
@@ -19,8 +22,18 @@ const spectrogramWrapEl = document.querySelector("#spectrogram-wrap") as HTMLEle
 const app = new App({ name: "Audio File App", version: "1.0.0" });
 app.connect();
 
-type AudioState = { path: string; blob: Blob; url: string; player: Player };
-type LoadedAudio = { blob: Blob; decodeFormat: AudioDecodeFormat | null };
+type AudioState = {
+    path: string;
+    blob: Blob;
+    url: string;
+    player: Player;
+    display: MetadataDisplay;
+};
+type LoadedAudio = {
+    blob: Blob;
+    format: AudioFormat | null;
+    decodeFormat: AudioDecodeFormat | null;
+};
 
 let currentAudio: AudioState | null = null;
 let loadGen = 0;
@@ -35,7 +48,7 @@ app.ontoolresult = async (result) => {
     const loaded = await loadAudio(filePath, () => myGen === loadGen);
     if (myGen !== loadGen || loaded === null) return;
 
-    const { blob, decodeFormat } = loaded;
+    const { blob, format, decodeFormat } = loaded;
     const url = URL.createObjectURL(blob);
     const player = createPlayer(
         url,
@@ -47,12 +60,20 @@ app.ontoolresult = async (result) => {
         durationEl,
         spectrogramWrapEl,
     );
-    currentAudio = { path: filePath, blob, url, player };
-    fileInfoEl.textContent = `File: ${filePath}, type: ${blob.type}, size: ${blob.size} bytes`;
+    const metadata = await extractMetadata(format, blob);
+    if (myGen !== loadGen) {
+        player.destroy();
+        URL.revokeObjectURL(url);
+        return;
+    }
+    const display = createMetadataDisplay(metadataEl, player.audio, player.worker);
+    display.update(metadata, filePath);
+    currentAudio = { path: filePath, blob, url, player, display };
 };
 
 function releaseCurrent(): void {
     if (currentAudio) {
+        currentAudio.display.destroy();
         currentAudio.player.destroy();
         URL.revokeObjectURL(currentAudio.url);
         currentAudio = null;
@@ -84,5 +105,5 @@ async function loadAudio(
     console.log(`Decoded base64 to blob in ${(performance.now() - strt).toFixed(2)} ms`);
     base64 = null;
     if (blob === null) return null;
-    return { blob, decodeFormat };
+    return { blob, format, decodeFormat };
 }

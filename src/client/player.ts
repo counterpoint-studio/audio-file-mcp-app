@@ -7,6 +7,8 @@ import { createWaveform, type Waveform } from "./waveform";
 
 export type Player = {
     destroy(): void;
+    audio: HTMLAudioElement;
+    worker: Worker;
 };
 
 export function createPlayer(
@@ -52,6 +54,8 @@ export function createPlayer(
     button.textContent = "Play";
 
     return {
+        audio,
+        worker: waveform.worker,
         destroy() {
             // Tear down render layers (which may still hold the blob) before
             // the audio detaches and the URL is revoked.

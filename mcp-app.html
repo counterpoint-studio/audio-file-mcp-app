@@ -5,7 +5,20 @@
     <title>Audio File</title>
   </head>
   <body>
-    <p id="file-info"></p>
+    <dl id="metadata">
+      <div><dt>Path</dt><dd id="md-path">—</dd></div>
+      <div><dt>Container</dt><dd id="md-container">—</dd></div>
+      <div><dt>Size</dt><dd id="md-size">—</dd></div>
+      <div hidden><dt>Channels</dt><dd id="md-channels"></dd></div>
+      <div hidden><dt>Sample rate</dt><dd id="md-samplerate"></dd></div>
+      <div hidden><dt>Bit depth</dt><dd id="md-bitdepth"></dd></div>
+      <div hidden><dt>Sample format</dt><dd id="md-sampleformat"></dd></div>
+      <div hidden><dt>Codec</dt><dd id="md-codec"></dd></div>
+      <div hidden><dt>Bitrate</dt><dd id="md-bitrate"></dd></div>
+      <div hidden><dt>Format type</dt><dd id="md-midi-format"></dd></div>
+      <div hidden><dt>Tracks</dt><dd id="md-midi-tracks"></dd></div>
+      <div hidden><dt>Ticks/quarter</dt><dd id="md-midi-division"></dd></div>
+    </dl>
     <div id="transport">
       <button id="play-pause" type="button" disabled>Play</button>
       <div id="seek-stack">
