@@ -4,6 +4,7 @@ export {};
 
 import decode, { type DecodedChunk } from "audio-decode";
 import { AnalysisPipeline } from "./analysis/pipeline";
+import { LoudnessAnalyzer, type LoudnessSummary } from "./analysis/loudness";
 import { SampleStatsAnalyzer } from "./analysis/sample-stats";
 import { TimeSeriesStore } from "./analysis/time-series";
 import { WaveformPeaksAnalyzer } from "./analysis/waveform-peaks";
@@ -11,6 +12,7 @@ import {
     STREAMABLE_DECODE_FORMATS,
     type AudioDecodeFormat,
 } from "./audio-formats";
+import { instantiate as instantiateDsp } from "./dsp/wasm-dsp.gen";
 
 type InitMsg = {
     type: "init";
@@ -40,7 +42,10 @@ const LIVE_INTERVAL_MS = 250;
 const timeSeries = new TimeSeriesStore();
 const waveform = new WaveformPeaksAnalyzer();
 const sampleStats = new SampleStatsAnalyzer(timeSeries);
-const pipeline = new AnalysisPipeline([waveform, sampleStats]);
+const loudness = new LoudnessAnalyzer(timeSeries);
+const pipeline = new AnalysisPipeline([waveform, sampleStats, loudness]);
+const dspReady = instantiateDsp();
+let loudnessSummary: LoudnessSummary | null = null;
 let decodeAbort = false;
 let lastLivePostAt = 0;
 
@@ -104,6 +109,8 @@ async function startDecode(
         return;
     }
     try {
+        await dspReady;
+        if (decodeAbort) return;
         if (STREAMABLE_DECODE_FORMATS.has(format)) {
             await runStreaming(blob, format);
         } else {
@@ -115,6 +122,7 @@ async function startDecode(
             maybePostLive();
         }
         pipeline.finalize();
+        loudnessSummary = loudness.summary();
         postLive();
         postFinal();
         self.postMessage({
@@ -181,11 +189,11 @@ function computeRunning(): {
     return {
         samplePeak: maxPeak,
         rms: Math.sqrt(sumSq / count),
-        truePeak: NaN,
+        truePeak: loudnessSummary ? loudnessSummary.truePeak : NaN,
         momentary: timeSeries.momentary[count - 1],
         shortTerm: timeSeries.shortTerm[count - 1],
-        integrated: NaN,
-        lra: NaN,
+        integrated: loudnessSummary ? loudnessSummary.integrated : NaN,
+        lra: loudnessSummary ? loudnessSummary.lra : NaN,
         clipping: clips,
     };
 }

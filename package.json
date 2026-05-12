@@ -11,6 +11,7 @@
   "type": "module",
   "scripts": {
     "build": "INPUT=mcp-app.html vite build",
+    "build:wasm": "scripts/build-wasm.sh",
     "serve": "npx tsx src/server/app.ts",
     "test": "vitest run",
     "typecheck": "tsc -b"
