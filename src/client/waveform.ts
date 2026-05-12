@@ -1,7 +1,7 @@
 import WaveformWorker from "./analysis-worker.ts?worker&inline";
 import { type AudioDecodeFormat } from "./audio-formats";
 
-export type Waveform = { destroy(): void };
+export type Waveform = { destroy(): void; worker: Worker };
 
 export function createWaveform(
     blob: Blob,
@@ -91,6 +91,7 @@ export function createWaveform(
     worker.addEventListener("message", onWorkerMessage);
 
     return {
+        worker,
         destroy() {
             ro.disconnect();
             if (pendingResizeRaf !== 0) {

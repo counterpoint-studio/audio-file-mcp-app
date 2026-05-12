@@ -5,3 +5,4 @@ It runs as an stdio MCP server and is designed for local files only.
 
 Instructions:
 - pnpm for package management
+- prefer unit testable modular code. write tests for all new and changed code, except when it's DOM manipulation / otherwise hard to test.

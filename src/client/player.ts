@@ -1,4 +1,5 @@
 import { type AudioDecodeFormat } from "./audio-formats";
+import { createMetrics, type Metrics } from "./metrics";
 import { createSeekBar, type SeekBar } from "./seek-bar";
 import { createTimeDisplay, type TimeDisplay } from "./time-display";
 import { createWaveform, type Waveform } from "./waveform";
@@ -22,6 +23,7 @@ export function createPlayer(
     const timeDisplay: TimeDisplay = createTimeDisplay(audio, positionEl, durationEl);
     const seekBar: SeekBar = createSeekBar(audio, seekBarEl, timeDisplay.update);
     const waveform: Waveform = createWaveform(blob, decodeFormat, audio, seekBarEl);
+    const metrics: Metrics = createMetrics(waveform.worker, seekBarEl, audio);
 
     const onClick = () => {
         if (audio.paused) {
@@ -50,6 +52,7 @@ export function createPlayer(
         destroy() {
             // Tear down render layers (which may still hold the blob) before
             // the audio detaches and the URL is revoked.
+            metrics.destroy();
             waveform.destroy();
             seekBar.destroy();
             timeDisplay.destroy();

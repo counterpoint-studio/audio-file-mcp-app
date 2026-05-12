@@ -16,8 +16,18 @@
           <canvas id="waveform"></canvas>
           <div id="playhead"></div>
         </div>
+        <div id="metric-tooltip" hidden></div>
       </div>
     </div>
+    <dl id="metrics">
+      <div><dt>Sample peak</dt><dd id="m-samplepeak">—</dd></div>
+      <div><dt>True peak</dt><dd id="m-truepeak">—</dd></div>
+      <div><dt>RMS</dt><dd id="m-rms">—</dd></div>
+      <div><dt>Crest</dt><dd id="m-crest">—</dd></div>
+      <div><dt>Clipping</dt><dd id="m-clipping">—</dd></div>
+      <div><dt>Integrated LUFS</dt><dd id="m-i">—</dd></div>
+      <div><dt>LRA</dt><dd id="m-lra">—</dd></div>
+    </dl>
     <script type="module" src="/src/client/app.ts"></script>
   </body>
 </html>
