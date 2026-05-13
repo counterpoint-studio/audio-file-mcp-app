@@ -209,12 +209,11 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    gap: var(--space-3);
+    gap: var(--space-2);
 }
 
-#stats-global {
-    display: flex;
-    gap: var(--space-3);
+#stats .sep {
+    color: var(--ink-faint);
 }
 
 #stats-sample {
