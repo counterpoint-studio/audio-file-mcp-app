@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createAudioContextPublisher } from "./audio-context-publisher";
+import type { ContextState } from "./model-context-text";
 import type { AudioMetadata } from "./metadata";
 
 beforeEach(() => {
@@ -9,10 +10,8 @@ afterEach(() => {
     vi.useRealTimers();
 });
 
-function makeApp() {
-    return {
-        updateModelContext: vi.fn().mockResolvedValue({}),
-    };
+function makeSubmit() {
+    return vi.fn<(s: ContextState) => void>();
 }
 
 const META: AudioMetadata = {
@@ -24,179 +23,150 @@ const META: AudioMetadata = {
     durationExact: true,
 };
 
+function lastState(submit: { mock: { calls: [ContextState][] } }): ContextState {
+    return submit.mock.calls[submit.mock.calls.length - 1][0];
+}
+
 describe("createAudioContextPublisher", () => {
-    it("setFile sends once with the file path", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app);
+    it("setFile sends once with the file path in state", () => {
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit);
         pub.setFile("/abs/x.flac");
-        expect(app.updateModelContext).toHaveBeenCalledTimes(1);
-        const args = app.updateModelContext.mock.calls[0][0];
-        const text = args.content[0].text as string;
-        expect(text).toContain("file: /abs/x.flac");
+        expect(submit).toHaveBeenCalledTimes(1);
+        expect(submit.mock.calls[0][0].path).toBe("/abs/x.flac");
     });
 
     it("rapid setPosition during playback collapses to ~1 Hz; pause flushes immediately", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app, { minIntervalMs: 1000 });
-        pub.setFile("/x.flac"); // 1 send
-        pub.setMetadata(META); // 2nd send
-        pub.setPlayback("playing"); // 3rd send (immediate)
-        const before = app.updateModelContext.mock.calls.length;
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit, { minIntervalMs: 1000 });
+        pub.setFile("/x.flac");
+        pub.setMetadata(META);
+        pub.setPlayback("playing");
+        const before = submit.mock.calls.length;
 
         for (let i = 0; i < 5; i++) {
             vi.advanceTimersByTime(100);
             pub.setPosition(i * 0.5, null);
         }
-        // Within the 1 s window after the playing transition, no extra calls
-        expect(app.updateModelContext.mock.calls.length).toBe(before);
+        expect(submit.mock.calls.length).toBe(before);
 
-        // Trailing arrives after the window
         vi.advanceTimersByTime(2000);
-        expect(app.updateModelContext.mock.calls.length).toBe(before + 1);
+        expect(submit.mock.calls.length).toBe(before + 1);
 
-        // Now do another round and pause flushes the trailing
         pub.setPosition(99, null);
         vi.advanceTimersByTime(50);
         pub.setPosition(99.5, null);
-        const beforePause = app.updateModelContext.mock.calls.length;
+        const beforePause = submit.mock.calls.length;
         pub.setPlayback("paused");
-        expect(app.updateModelContext.mock.calls.length).toBeGreaterThan(beforePause);
-        const lastCall = app.updateModelContext.mock.calls[
-            app.updateModelContext.mock.calls.length - 1
-        ][0];
-        expect((lastCall.content[0].text as string)).toContain("playback: paused");
+        expect(submit.mock.calls.length).toBeGreaterThan(beforePause);
+        expect(lastState(submit).playback).toBe("paused");
     });
 
     it("rapid setRegionPreview collapses; setRegion flushes immediately", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app, { minIntervalMs: 1000 });
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit, { minIntervalMs: 1000 });
         pub.setFile("/x.flac");
         pub.setMetadata(META);
-        const before = app.updateModelContext.mock.calls.length;
+        const before = submit.mock.calls.length;
         for (let i = 0; i < 5; i++) {
             vi.advanceTimersByTime(50);
             pub.setRegionPreview(i, i + 1);
         }
-        expect(app.updateModelContext.mock.calls.length).toBe(before);
+        expect(submit.mock.calls.length).toBe(before);
         pub.setRegion(2, 5);
-        expect(app.updateModelContext.mock.calls.length).toBe(before + 1);
-        const last = app.updateModelContext.mock.calls[
-            app.updateModelContext.mock.calls.length - 1
-        ][0];
-        const text = last.content[0].text as string;
-        expect(text).toContain("region-start-seconds: 2.00");
-        expect(text).toContain("region-end-seconds: 5.00");
+        expect(submit.mock.calls.length).toBe(before + 1);
+        const s = lastState(submit);
+        expect(s.region).toEqual({ startSeconds: 2, endSeconds: 5 });
     });
 
-    it("clearRegion removes region keys from the next payload", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app);
+    it("clearRegion drops region from the next state", () => {
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit);
         pub.setFile("/x.flac");
         pub.setMetadata(META);
         pub.setRegion(2, 5);
         pub.clearRegion();
-        const last = app.updateModelContext.mock.calls[
-            app.updateModelContext.mock.calls.length - 1
-        ][0];
-        const text = last.content[0].text as string;
-        expect(text).not.toContain("region-start-seconds:");
-        expect(text).not.toContain("region-end-seconds:");
+        expect(lastState(submit).region).toBeNull();
     });
 
-    it("routes updateModelContext rejection to logError and keeps working", async () => {
-        const app = {
-            updateModelContext: vi
-                .fn()
-                .mockRejectedValueOnce(new Error("nope"))
-                .mockResolvedValue({}),
-        };
+    it("submit throwing is caught and routed to logError without corrupting throttle", () => {
+        const submit = vi
+            .fn<(s: ContextState) => void>()
+            .mockImplementationOnce(() => {
+                throw new Error("boom");
+            });
         const logError = vi.fn();
-        const pub = createAudioContextPublisher(app, { logError });
+        const pub = createAudioContextPublisher(submit, { logError });
         pub.setFile("/x.flac");
-        // let microtasks flush
-        await Promise.resolve();
-        await Promise.resolve();
         expect(logError).toHaveBeenCalledTimes(1);
+        // Throttle state is still valid; further sends proceed.
         pub.setMetadata(META);
-        expect(app.updateModelContext).toHaveBeenCalledTimes(2);
+        expect(submit).toHaveBeenCalledTimes(2);
     });
 
     it("destroy cancels pending and ignores subsequent setters", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app, { minIntervalMs: 1000 });
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit, { minIntervalMs: 1000 });
         pub.setFile("/x.flac");
         vi.advanceTimersByTime(50);
-        pub.setPosition(1, null); // schedules trailing
-        const before = app.updateModelContext.mock.calls.length;
+        pub.setPosition(1, null);
+        const before = submit.mock.calls.length;
         pub.destroy();
         vi.advanceTimersByTime(5000);
-        pub.setMetadata(META); // ignored
-        pub.setRegion(1, 2); // ignored
-        expect(app.updateModelContext.mock.calls.length).toBe(before);
+        pub.setMetadata(META);
+        pub.setRegion(1, 2);
+        expect(submit.mock.calls.length).toBe(before);
     });
 
-    it("setError after setFile publishes with error frontmatter and message", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app);
+    it("setError after setFile publishes state with error field", () => {
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit);
         pub.setFile("/x.mp3");
         pub.setError("decode-failed", "bad header");
-        const last = app.updateModelContext.mock.calls[
-            app.updateModelContext.mock.calls.length - 1
-        ][0];
-        const text = last.content[0].text as string;
-        expect(text).toContain("error: decode-failed");
-        expect(text).toContain('error-message: "bad header"');
-        expect(text).toContain("The file could not be decoded (bad header).");
+        expect(lastState(submit).error).toEqual({
+            kind: "decode-failed",
+            message: "bad header",
+        });
     });
 
-    it("clearError drops error keys from the next payload", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app);
+    it("clearError drops error from the next state", () => {
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit);
         pub.setFile("/x.mp3");
         pub.setError("unsupported");
         pub.clearError();
-        const last = app.updateModelContext.mock.calls[
-            app.updateModelContext.mock.calls.length - 1
-        ][0];
-        const text = last.content[0].text as string;
-        expect(text).not.toContain("error:");
-        expect(text).not.toContain("error-message:");
+        expect(lastState(submit).error).toBeNull();
     });
 
-    it("setError before setFile is included in the first published payload", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app);
-        // Without a path, build produces an empty string, so no send.
+    it("setError before setFile does not send; first send after setFile carries the error", () => {
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit);
         pub.setError("unsupported");
-        expect(app.updateModelContext).not.toHaveBeenCalled();
+        expect(submit).not.toHaveBeenCalled();
         pub.setFile("/x.bin");
-        const last = app.updateModelContext.mock.calls[
-            app.updateModelContext.mock.calls.length - 1
-        ][0];
-        const text = last.content[0].text as string;
-        expect(text).toContain("error: unsupported");
+        expect(lastState(submit).error).toEqual({ kind: "unsupported" });
     });
 
     it("destroy then setError is a no-op", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app);
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit);
         pub.setFile("/x.mp3");
-        const before = app.updateModelContext.mock.calls.length;
+        const before = submit.mock.calls.length;
         pub.destroy();
         pub.setError("decode-failed", "x");
-        expect(app.updateModelContext.mock.calls.length).toBe(before);
+        expect(submit.mock.calls.length).toBe(before);
     });
 
     it("skips publish when position rounds to the same 0.01 s with no samples", () => {
-        const app = makeApp();
-        const pub = createAudioContextPublisher(app, { minIntervalMs: 1000 });
+        const submit = makeSubmit();
+        const pub = createAudioContextPublisher(submit, { minIntervalMs: 1000 });
         pub.setFile("/x.flac");
         pub.setMetadata(META);
         pub.setPlayback("paused");
-        const before = app.updateModelContext.mock.calls.length;
+        const before = submit.mock.calls.length;
         pub.setPosition(0, null);
         pub.setPosition(0.001, null);
         pub.setPosition(0.002, null);
-        expect(app.updateModelContext.mock.calls.length).toBe(before);
+        expect(submit.mock.calls.length).toBe(before);
     });
 });

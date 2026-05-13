@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
     buildContextMarkdown,
+    buildCombinedContextMarkdown,
     emptyContextState,
+    type CombinedEntry,
     type ContextState,
 } from "./model-context-text";
 import type { AudioMetadata } from "./metadata";
@@ -251,5 +253,79 @@ describe("buildContextMarkdown", () => {
         expect(buildContextMarkdown({ ...base, playback: "paused" })).toContain(
             "playback: paused",
         );
+    });
+});
+
+describe("buildCombinedContextMarkdown", () => {
+    function entry(
+        createdAt: number,
+        seq: number,
+        instanceId: string,
+        state: Partial<ContextState>,
+    ): CombinedEntry {
+        return {
+            key: { createdAt, seq, instanceId },
+            state: { ...emptyContextState(), ...state },
+        };
+    }
+
+    function loaded(path: string): Partial<ContextState> {
+        return {
+            path,
+            metadata: { container: "wav", sizeBytes: 100 },
+        };
+    }
+
+    it("returns empty string for zero entries", () => {
+        expect(buildCombinedContextMarkdown([])).toBe("");
+    });
+
+    it("single entry returns the unchanged single-instance markdown", () => {
+        const e = entry(1, 1, "a", loaded("/x.wav"));
+        expect(buildCombinedContextMarkdown([e])).toBe(
+            buildContextMarkdown(e.state),
+        );
+    });
+
+    it("three out-of-order entries sort ascending and number sections 1-based", () => {
+        const a = entry(200, 2, "a", loaded("/abs/a.flac"));
+        const b = entry(100, 5, "b", loaded("/abs/b.wav"));
+        const c = entry(150, 1, "c", loaded("/abs/c.mp3"));
+        const out = buildCombinedContextMarkdown([a, b, c]);
+        expect(out).toContain("The user has 3 audio files open.");
+        const ai = out.indexOf("## Audio file 1");
+        const bi = out.indexOf("## Audio file 2");
+        const ci = out.indexOf("## Audio file 3");
+        expect(ai).toBeGreaterThan(-1);
+        expect(bi).toBeGreaterThan(ai);
+        expect(ci).toBeGreaterThan(bi);
+        // Sorted order: b (createdAt=100), c (150), a (200)
+        const bPath = out.indexOf("/abs/b.wav");
+        const cPath = out.indexOf("/abs/c.mp3");
+        const aPath = out.indexOf("/abs/a.flac");
+        expect(bPath).toBeGreaterThan(-1);
+        expect(cPath).toBeGreaterThan(bPath);
+        expect(aPath).toBeGreaterThan(cPath);
+    });
+
+    it("breaks ties on equal (createdAt, seq) using instanceId lexicographically", () => {
+        const a = entry(10, 1, "zzz", loaded("/zzz.wav"));
+        const b = entry(10, 1, "aaa", loaded("/aaa.wav"));
+        const out = buildCombinedContextMarkdown([a, b]);
+        const aaaIdx = out.indexOf("/aaa.wav");
+        const zzzIdx = out.indexOf("/zzz.wav");
+        expect(aaaIdx).toBeGreaterThan(-1);
+        expect(zzzIdx).toBeGreaterThan(aaaIdx);
+    });
+
+    it("drops entries with path === null from output and preamble count", () => {
+        const a = entry(1, 1, "a", loaded("/a.wav"));
+        const empty = entry(2, 2, "b", {});
+        const c = entry(3, 3, "c", loaded("/c.wav"));
+        const out = buildCombinedContextMarkdown([a, empty, c]);
+        expect(out).toContain("The user has 2 audio files open.");
+        expect(out).toContain("## Audio file 1");
+        expect(out).toContain("## Audio file 2");
+        expect(out).not.toContain("## Audio file 3");
     });
 });

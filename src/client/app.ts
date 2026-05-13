@@ -16,6 +16,7 @@ import {
     createAudioContextPublisher,
     type AudioContextPublisher,
 } from "./audio-context-publisher";
+import { createInstanceCoordinator } from "./instance-coordinator";
 import {
     parseDisplayAudioInit,
     type DisplayAudioInit,
@@ -67,6 +68,10 @@ function hideError(): void {
 const app = new App({ name: "Audio File App", version: "1.0.0" });
 const connected = app.connect();
 wireTheme(app, connected);
+const coordinator = createInstanceCoordinator(app);
+window.addEventListener("pagehide", () => coordinator.destroy(), { once: true });
+
+let keyWarned = false;
 
 type AudioState = {
     path: string;
@@ -89,6 +94,22 @@ app.ontoolresult = async (result) => {
     const init = parseDisplayAudioInit(result);
     if (!init) return;
     const filePath = init.path;
+
+    const sc = result.structuredContent as
+        | { createdAt?: unknown; seq?: unknown }
+        | undefined;
+    if (
+        sc &&
+        typeof sc.createdAt === "number" &&
+        typeof sc.seq === "number"
+    ) {
+        coordinator.setKey({ createdAt: sc.createdAt, seq: sc.seq });
+    } else if (!keyWarned) {
+        keyWarned = true;
+        console.warn(
+            "missing election key on toolresult — multi-instance coordination disabled",
+        );
+    }
 
     const myGen = ++loadGen;
     releaseCurrent();
@@ -115,7 +136,9 @@ app.ontoolresult = async (result) => {
         const durationExact = metadata?.durationExact ?? false;
 
         const url = URL.createObjectURL(blob);
-        const publisher = createAudioContextPublisher(app);
+        const publisher = createAudioContextPublisher((s) =>
+            coordinator.submitLocal(s),
+        );
         publisher.setFile(filePath);
         publisher.setMetadata(metadata);
         publisher.setDurationSeconds(durationSeconds);

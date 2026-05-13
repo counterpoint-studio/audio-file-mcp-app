@@ -1,6 +1,4 @@
-import type { App } from "@modelcontextprotocol/ext-apps";
 import {
-    buildContextMarkdown,
     emptyContextState,
     type ContextState,
     type DecodeErrorKind,
@@ -38,27 +36,23 @@ export type AudioContextPublisherOpts = {
     timer?: Pick<ThrottledPublisherOpts, "now" | "setTimer" | "clearTimer">;
 };
 
-type UpdateModelContextApp = Pick<App, "updateModelContext">;
+export type AudioContextPublisherSubmit = (state: ContextState) => void;
 
 export function createAudioContextPublisher(
-    app: UpdateModelContextApp,
+    submit: AudioContextPublisherSubmit,
     opts: AudioContextPublisherOpts = {},
 ): AudioContextPublisher {
     const minIntervalMs = opts.minIntervalMs ?? 1000;
-    const logError = opts.logError ?? ((e: unknown) => console.warn("updateModelContext failed", e));
+    const logError =
+        opts.logError ?? ((e: unknown) => console.warn("publisher send failed", e));
 
     const state: ContextState = emptyContextState();
     let destroyed = false;
 
     const send = (): void => {
-        const text = buildContextMarkdown(state);
-        if (!text) return;
+        if (state.path === null) return;
         try {
-            const result = app.updateModelContext({ content: [{ type: "text", text }] });
-            const maybe = result as unknown;
-            if (maybe && typeof (maybe as { catch?: unknown }).catch === "function") {
-                (maybe as Promise<unknown>).catch(logError);
-            }
+            submit({ ...state });
         } catch (e) {
             logError(e);
         }

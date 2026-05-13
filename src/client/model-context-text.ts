@@ -58,6 +58,50 @@ export function emptyContextState(): ContextState {
     };
 }
 
+export type InstanceKey = {
+    createdAt: number;
+    seq: number;
+    instanceId: string;
+};
+
+export type CombinedEntry = {
+    key: InstanceKey;
+    state: ContextState;
+};
+
+export function compareKeys(a: CombinedEntry, b: CombinedEntry): number {
+    if (a.key.createdAt !== b.key.createdAt) return a.key.createdAt - b.key.createdAt;
+    if (a.key.seq !== b.key.seq) return a.key.seq - b.key.seq;
+    if (a.key.instanceId < b.key.instanceId) return -1;
+    if (a.key.instanceId > b.key.instanceId) return 1;
+    return 0;
+}
+
+/**
+ * Render combined model context for one or more live instances.
+ * Entries are sorted ascending by (createdAt, seq, instanceId) so the
+ * model sees files in instantiation order regardless of who is reporting.
+ * Single-instance output is the existing buildContextMarkdown text —
+ * no preamble, no heading.
+ */
+export function buildCombinedContextMarkdown(entries: CombinedEntry[]): string {
+    const sorted = [...entries]
+        .filter((e) => e.state.path !== null)
+        .sort(compareKeys);
+
+    if (sorted.length === 0) return "";
+    if (sorted.length === 1) {
+        return buildContextMarkdown(sorted[0].state);
+    }
+
+    const sections = sorted.map((e, i) => {
+        const block = buildContextMarkdown(e.state);
+        return `## Audio file ${i + 1}\n\n${block}`;
+    });
+    const preamble = `The user has ${sorted.length} audio files open.`;
+    return `${preamble}\n\n${sections.join("\n\n")}`;
+}
+
 export function buildContextMarkdown(state: ContextState): string {
     if (state.path === null) return "";
 

@@ -24,6 +24,8 @@ const regionSchema = z.object({
   endSeconds: z.number().min(0).finite(),
 });
 
+let callSeq = 0;
+
 registerAppTool(
   server,
   "display-audio-file",
@@ -55,7 +57,13 @@ registerAppTool(
     if (!normalized) {
       throw new Error("Path parameter is required");
     }
-    const structuredContent: Record<string, unknown> = { path: normalized };
+    const seq = ++callSeq;
+    const createdAt = Date.now();
+    const structuredContent: Record<string, unknown> = {
+      path: normalized,
+      createdAt,
+      seq,
+    };
     if (playheadSeconds !== undefined) {
       structuredContent.playheadSeconds = playheadSeconds;
     }
