@@ -9,6 +9,7 @@ import { LoudnessAnalyzer, type LoudnessSummary } from "./analysis/loudness";
 import { SampleStatsAnalyzer } from "./analysis/sample-stats";
 import { SpectrogramAnalyzer } from "./analysis/spectrogram";
 import { TimeSeriesStore } from "./analysis/time-series";
+import { WaveformBandEnergyAnalyzer } from "./analysis/waveform-band-energy";
 import { WaveformPeaksAnalyzer } from "./analysis/waveform-peaks";
 import {
     STREAMABLE_DECODE_FORMATS,
@@ -75,17 +76,19 @@ function maybePostDecoderInfo(): void {
 }
 
 const timeSeries = new TimeSeriesStore();
-const waveform = new WaveformPeaksAnalyzer();
+const bandEnergy = new WaveformBandEnergyAnalyzer();
+const waveform = new WaveformPeaksAnalyzer(bandEnergy);
 const sampleStats = new SampleStatsAnalyzer(timeSeries);
 const loudness = new LoudnessAnalyzer(timeSeries);
 const spectrogram = new SpectrogramAnalyzer();
-const frameRouter = new FrameRouter([spectrogram]);
+const frameRouter = new FrameRouter([spectrogram, bandEnergy]);
 const pipeline = new AnalysisPipeline([
     waveform,
     sampleStats,
     loudness,
     frameRouter,
     spectrogram,
+    bandEnergy,
 ]);
 const dspReady = instantiateDsp();
 let loudnessSummary: LoudnessSummary | null = null;

@@ -1,5 +1,7 @@
 import type { Analyzer, AnalyzerChunk } from "./analyzer";
+import { bandEnergyToFillStyle } from "./band-shading";
 import { GrowablePeaks } from "./growable-peaks";
+import type { WaveformBandEnergyAnalyzer } from "./waveform-band-energy";
 
 const PEAKS_PER_SECOND = 200;
 const REDRAW_INTERVAL_MS = 50;
@@ -16,6 +18,8 @@ export class WaveformPeaksAnalyzer implements Analyzer {
     private cssHeight = 0;
     private durationSeconds: number | null = null;
     private lastRedrawAt = 0;
+
+    constructor(private bandEnergy?: WaveformBandEnergyAnalyzer) {}
 
     get peakCount(): number {
         return this.peaks.count;
@@ -162,8 +166,8 @@ export class WaveformPeaksAnalyzer implements Analyzer {
         const halfH = this.cssHeight / 2 - 1;
 
         ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
-        ctx.fillStyle = "#111";
-        ctx.beginPath();
+        const totalSeconds = this.durationSeconds;
+        const cssWidth = this.cssWidth;
         for (let col = 0; col < decodedColumns; col++) {
             const start = Math.floor(col * bucketsPerColumn);
             const end = Math.min(
@@ -181,8 +185,18 @@ export class WaveformPeaksAnalyzer implements Analyzer {
             if (mn === Infinity) continue;
             const yTop = cy - mx * halfH;
             const yBot = cy - mn * halfH;
-            ctx.rect(col, yTop, 1, Math.max(1, yBot - yTop));
+            const h = Math.max(1, yBot - yTop);
+
+            if (this.bandEnergy) {
+                const t0 = (col / cssWidth) * totalSeconds;
+                const t1 = ((col + 1) / cssWidth) * totalSeconds;
+                ctx.fillStyle = bandEnergyToFillStyle(
+                    this.bandEnergy.queryRange(t0, t1),
+                );
+            } else {
+                ctx.fillStyle = "#111";
+            }
+            ctx.fillRect(col, yTop, 1, h);
         }
-        ctx.fill();
     }
 }
