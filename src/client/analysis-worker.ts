@@ -17,6 +17,7 @@ import {
 } from "./audio-formats";
 import { shouldApplyFinalDuration } from "./analysis/duration-correction";
 import { instantiate as instantiateDsp } from "./dsp/wasm-dsp.gen";
+import { boundWavBlob } from "./wav-data-bound";
 
 type InitMsg = {
     type: "init";
@@ -192,7 +193,9 @@ async function startDecode(
         await dspReady;
         if (decodeAbort) return;
         if (STREAMABLE_DECODE_FORMATS.has(format)) {
-            await runStreaming(blob, format);
+            const sourceBlob = format === "wav" ? await boundWavBlob(blob) : blob;
+            if (decodeAbort) return;
+            await runStreaming(sourceBlob, format);
         } else {
             const buf = await blob.arrayBuffer();
             if (decodeAbort) return;

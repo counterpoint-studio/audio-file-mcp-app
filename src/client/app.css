@@ -1,5 +1,4 @@
 :root {
-    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     --fs-sm: 0.75rem;
     --fs-xs: 0.6875rem;
     --lh: 1.4;
@@ -7,29 +6,31 @@
     --space-2: 8px;
     --space-3: 12px;
     --space-4: 16px;
-    --surface: #fafafa;
-    --ink: #111;
-    --ink-mute: #666;
-    --ink-faint: #aaa;
+    --ink: var(--color-text-primary, #111);
+    --ink-mute: var(--color-text-secondary, #666);
+    --ink-faint: var(--color-text-tertiary, #aaa);
+    --border: var(--color-border-primary, #dcdcdc);
+    --seek-bg: var(--color-background-secondary, #ececec);
     --accent: #e6007e;
-    --seek-bg: #ececec;
-    --border: #dcdcdc;
     --spectrogram-h: 60px;
-}
-
-[data-theme="dark"] {
-    --surface: #18181b;
-    --ink: #e7e7ea;
-    --ink-mute: #9a9aa1;
-    --ink-faint: #555558;
-    --seek-bg: #232327;
-    --border: #3a3a40;
 }
 
 html,
 body {
     margin: 0;
     padding: 0;
+    background: transparent;
+}
+
+[data-theme="dark"] {
+    /* Fallbacks only — used when the host applies a dark theme but does
+       not provide colour tokens. When the host provides tokens, the
+       var() chain above resolves to them instead. */
+    --ink: var(--color-text-primary, #e7e7ea);
+    --ink-mute: var(--color-text-secondary, #9a9aa1);
+    --ink-faint: var(--color-text-tertiary, #555558);
+    --border: var(--color-border-primary, #3a3a40);
+    --seek-bg: var(--color-background-secondary, #232327);
 }
 
 body {
@@ -41,9 +42,8 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    background: var(--surface);
     color: var(--ink);
-    font-family: var(--font-mono);
+    font-family: var(--font-sans, system-ui, sans-serif);
     font-size: var(--fs-sm);
     line-height: var(--lh);
     padding: var(--space-3) var(--space-4);
@@ -148,7 +148,7 @@ body {
     padding: 0;
     border-radius: 50%;
     border: 1px solid var(--ink);
-    background: var(--surface);
+    background: transparent;
     color: var(--ink);
     display: inline-flex;
     align-items: center;
@@ -217,6 +217,7 @@ body {
 
 #time-display {
     flex: none;
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
     font-variant-numeric: tabular-nums;
     color: var(--ink-mute);
     user-select: none;
@@ -233,7 +234,6 @@ body {
     min-height: 0;
     position: relative;
     background: var(--seek-bg);
-    border: 1px solid var(--border);
     cursor: pointer;
     touch-action: none;
     container-type: inline-size;
@@ -301,6 +301,7 @@ body {
     justify-content: space-between;
     align-items: baseline;
     gap: var(--space-2);
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
 }
 
 #stats .sep {
@@ -315,6 +316,7 @@ body {
     display: flex;
     align-items: baseline;
     gap: var(--space-2);
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
     font-size: 10px;
     font-variant-numeric: tabular-nums;
     pointer-events: none;
@@ -340,6 +342,7 @@ body {
     display: flex;
     align-items: baseline;
     gap: var(--space-1);
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
     font-size: 10px;
     font-variant-numeric: tabular-nums;
     color: var(--ink);

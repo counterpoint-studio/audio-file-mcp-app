@@ -1,4 +1,10 @@
-import { type App, applyDocumentTheme } from "@modelcontextprotocol/ext-apps";
+import {
+    type App,
+    type McpUiHostContext,
+    applyDocumentTheme,
+    applyHostStyleVariables,
+    applyHostFonts,
+} from "@modelcontextprotocol/ext-apps";
 
 export type Theme = "light" | "dark";
 
@@ -29,11 +35,24 @@ function themeFrom(ctx: { theme?: Theme } | undefined): Theme {
     return current;
 }
 
+function applyHostStyles(ctx: McpUiHostContext | undefined): void {
+    if (!ctx?.styles) return;
+    if (ctx.styles.variables) applyHostStyleVariables(ctx.styles.variables);
+    if (ctx.styles.css?.fonts) applyHostFonts(ctx.styles.css.fonts);
+}
+
 // Must be called before app.connect() resolves; the SDK rejects
 // onhostcontextchanged handlers installed after connect.
 export function wireTheme(app: App, connected: Promise<void>): void {
-    app.onhostcontextchanged = (ctx) => setTheme(themeFrom(ctx));
-    void connected.then(() => setTheme(themeFrom(app.getHostContext())));
+    app.onhostcontextchanged = (ctx) => {
+        applyHostStyles(ctx);
+        setTheme(themeFrom(ctx));
+    };
+    void connected.then(() => {
+        const ctx = app.getHostContext();
+        applyHostStyles(ctx);
+        setTheme(themeFrom(ctx));
+    });
 }
 
 // Test-only: reset module-level state between tests.
