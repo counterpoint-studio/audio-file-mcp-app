@@ -180,7 +180,7 @@ body {
     right: 0;
     bottom: 0;
     height: var(--spectrogram-h);
-    background: var(--seek-bg);
+    background: #000;
     border-top: 1px solid var(--border);
     overflow: hidden;
 }

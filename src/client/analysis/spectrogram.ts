@@ -13,16 +13,37 @@ const REDRAW_INTERVAL_MS = 50;
 const MIN_HZ = 20;
 const FLOOR_DB = -100;
 const CEIL_DB = 0;
+// Hann-windowed PFFFT of size FFT_SIZE maps a full-scale sine to magnitude FFT_SIZE/4.
+// Dividing by this normalises the per-bin magnitude so 0 dB ≈ peak amplitude 1.0.
+const MAG_REF = FFT_SIZE / 4;
+const FLOOR_MAG = MAG_REF * Math.pow(10, FLOOR_DB / 20);
 
-function makeColorLut(): Uint8ClampedArray {
+// Matplotlib "inferno" sampled at 9 stops; lerp in linear RGB between them.
+const INFERNO_STOPS: ReadonlyArray<readonly [number, number, number]> = [
+    [0, 0, 4],
+    [24, 15, 61],
+    [66, 10, 104],
+    [120, 28, 109],
+    [171, 51, 98],
+    [217, 80, 64],
+    [245, 125, 21],
+    [251, 192, 50],
+    [252, 255, 164],
+];
+
+export function makeColorLut(): Uint8ClampedArray {
     const lut = new Uint8ClampedArray(256 * 4);
-    // Silence → near-surface (#fafafa-ish), peak → near-black (#141414).
+    const segments = INFERNO_STOPS.length - 1;
     for (let i = 0; i < 256; i++) {
         const t = i / 255;
-        const v = Math.round(250 - 230 * t);
-        lut[i * 4 + 0] = v;
-        lut[i * 4 + 1] = v;
-        lut[i * 4 + 2] = v;
+        const s = t * segments;
+        const idx = Math.min(segments - 1, Math.floor(s));
+        const f = s - idx;
+        const a = INFERNO_STOPS[idx];
+        const b = INFERNO_STOPS[idx + 1];
+        lut[i * 4 + 0] = Math.round(a[0] + (b[0] - a[0]) * f);
+        lut[i * 4 + 1] = Math.round(a[1] + (b[1] - a[1]) * f);
+        lut[i * 4 + 2] = Math.round(a[2] + (b[2] - a[2]) * f);
         lut[i * 4 + 3] = 255;
     }
     return lut;
@@ -275,7 +296,7 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
             const srcOff = col * NUM_BINS;
             for (let b = 0; b < NUM_BINS; b++) {
                 const mag = this.grid[srcOff + b];
-                let db = mag > 0 ? 20 * Math.log10(mag) : FLOOR_DB;
+                let db = mag > FLOOR_MAG ? 20 * Math.log10(mag / MAG_REF) : FLOOR_DB;
                 if (db < FLOOR_DB) db = FLOOR_DB;
                 if (db > CEIL_DB) db = CEIL_DB;
                 const t = (db - FLOOR_DB) / range;
