@@ -162,7 +162,7 @@ export class WaveformPeaksAnalyzer implements Analyzer {
         const halfH = this.cssHeight / 2 - 1;
 
         ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
-        ctx.fillStyle = "#7aa";
+        ctx.fillStyle = "#111";
         ctx.beginPath();
         for (let col = 0; col < decodedColumns; col++) {
             const start = Math.floor(col * bucketsPerColumn);

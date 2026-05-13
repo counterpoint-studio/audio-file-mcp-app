@@ -1,3 +1,22 @@
+:root {
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --fs-sm: 0.75rem;
+    --fs-xs: 0.6875rem;
+    --lh: 1.4;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --surface: #fafafa;
+    --ink: #111;
+    --ink-mute: #666;
+    --ink-faint: #aaa;
+    --accent: #e6007e;
+    --seek-bg: #ececec;
+    --border: #dcdcdc;
+    --spectrogram-h: 60px;
+}
+
 html,
 body {
     margin: 0;
@@ -6,75 +25,126 @@ body {
 
 body {
     /* Inline-mode layout: fills the iframe horizontally and reports a fixed
-       height back to the host via the SDK's autoResize. Bump the height as
-       features (transport, waveform, meters) land. */
+       height back to the host via the SDK's autoResize. */
     width: 100%;
-    height: 380px;
+    height: 240px;
     box-sizing: border-box;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    line-height: var(--lh);
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-2);
 }
 
-#transport {
+#top {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0 0.5rem 0.5rem;
-    flex: 1;
-    min-height: 0;
+    gap: var(--space-3);
+    flex: none;
 }
 
-#spectrogram-wrap {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 80px;
-    background: #000;
-    border-top: 1px solid #ddd;
+#info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#info-primary,
+#info-secondary-meta {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+#info-secondary {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+#info-secondary-meta {
+    flex: 1 1 auto;
     overflow: hidden;
 }
 
-#spectrogram {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
+.meta-part {
+    flex: none;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
+.meta-part.filename {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.meta-part + .meta-part::before {
+    content: "·";
+    color: var(--ink-faint);
+    margin-right: var(--space-2);
+}
+
+.meta-part:empty,
+.meta-part:empty + .meta-part::before {
+    display: none;
 }
 
 #play-pause {
     flex: none;
-    padding: 0.4rem 1rem;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--ink);
+    background: var(--surface);
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+}
+
+#play-pause:hover:not(:disabled) {
+    color: var(--accent);
+}
+
+#play-pause:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 #play-pause:disabled {
     cursor: not-allowed;
-    opacity: 0.6;
+    color: var(--ink-faint);
+    border-color: var(--ink-faint);
 }
 
-#seek-stack {
-    flex: 1;
-    align-self: stretch;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    position: relative;
-}
+#play-pause .ic { display: none; }
+#play-pause .ic-play { display: inline; }
+#play-pause.is-playing .ic-play { display: none; }
+#play-pause.is-playing .ic-pause { display: inline; }
+
+#play-pause .ic-play { transform: translateX(1px); }
 
 #time-display {
     flex: none;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 0.85rem;
     font-variant-numeric: tabular-nums;
-    color: #333;
+    color: var(--ink-mute);
     user-select: none;
     white-space: nowrap;
-    line-height: 1;
 }
 
 #time-display #position,
@@ -86,8 +156,8 @@ body {
     flex: 1;
     min-height: 0;
     position: relative;
-    background: #f0f0f0;
-    border: 1px solid #ddd;
+    background: var(--seek-bg);
+    border: 1px solid var(--border);
     cursor: pointer;
     touch-action: none;
     container-type: inline-size;
@@ -99,8 +169,27 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: calc(100% - 80px);
+    height: calc(100% - var(--spectrogram-h));
     pointer-events: none;
+    display: block;
+}
+
+#spectrogram-wrap {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--spectrogram-h);
+    background: var(--seek-bg);
+    border-top: 1px solid var(--border);
+    overflow: hidden;
+}
+
+#spectrogram {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     display: block;
 }
 
@@ -110,79 +199,61 @@ body {
     left: 0;
     width: 2px;
     height: 100%;
-    background: #333;
+    background: var(--accent);
     transform: translateX(calc(var(--progress, 0) * 100cqi));
     pointer-events: none;
     will-change: transform;
 }
 
-#metric-tooltip {
+#stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+}
+
+#stats-global {
+    display: flex;
+    gap: var(--space-3);
+}
+
+#stats-sample {
     position: absolute;
-    pointer-events: none;
-    background: #222;
-    color: #fff;
-    padding: 0.3rem 0.45rem;
-    border-radius: 3px;
-    font-family: ui-monospace, monospace;
-    font-size: 0.7rem;
-    white-space: pre;
-    transform: translateX(-50%);
+    top: var(--space-1);
+    left: var(--space-2);
     z-index: 2;
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
 }
 
-#metric-tooltip[hidden] {
+#stats-sample[hidden] {
     display: none;
 }
 
-#metrics {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem 1rem;
-    margin: 0;
-    padding: 0.35rem 0.5rem 0.5rem;
-    font-size: 0.78rem;
-    font-family: ui-monospace, monospace;
+#stats-sample .stat .k {
+    font-size: inherit;
 }
 
-#metrics > div {
-    display: flex;
-    gap: 0.3rem;
+#stats-sample .stat-time {
+    color: var(--ink);
 }
 
-#metrics dt {
-    color: #777;
+.stat {
+    display: inline-flex;
+    gap: var(--space-1);
+    align-items: baseline;
 }
 
-#metrics dd {
-    margin: 0;
+.stat .k {
+    color: var(--ink-mute);
+    font-size: var(--fs-xs);
+}
+
+.stat .v {
+    color: var(--ink);
     font-variant-numeric: tabular-nums;
-}
-
-#metadata {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem 1rem;
-    margin: 0;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.78rem;
-    font-family: ui-monospace, monospace;
-}
-
-#metadata > div {
-    display: flex;
-    gap: 0.3rem;
-}
-
-#metadata > div[hidden] {
-    display: none;
-}
-
-#metadata dt {
-    color: #777;
-}
-
-#metadata dd {
-    margin: 0;
-    font-variant-numeric: tabular-nums;
-    word-break: break-all;
 }

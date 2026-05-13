@@ -5,43 +5,51 @@
     <title>Audio File</title>
   </head>
   <body>
-    <dl id="metadata">
-      <div><dt>Path</dt><dd id="md-path">—</dd></div>
-      <div><dt>Container</dt><dd id="md-container">—</dd></div>
-      <div><dt>Size</dt><dd id="md-size">—</dd></div>
-      <div hidden><dt>Channels</dt><dd id="md-channels"></dd></div>
-      <div hidden><dt>Sample rate</dt><dd id="md-samplerate"></dd></div>
-      <div hidden><dt>Bit depth</dt><dd id="md-bitdepth"></dd></div>
-      <div hidden><dt>Sample format</dt><dd id="md-sampleformat"></dd></div>
-      <div hidden><dt>Codec</dt><dd id="md-codec"></dd></div>
-      <div hidden><dt>Bitrate</dt><dd id="md-bitrate"></dd></div>
-      <div hidden><dt>Format type</dt><dd id="md-midi-format"></dd></div>
-      <div hidden><dt>Tracks</dt><dd id="md-midi-tracks"></dd></div>
-      <div hidden><dt>Ticks/quarter</dt><dd id="md-midi-division"></dd></div>
-    </dl>
-    <div id="transport">
-      <button id="play-pause" type="button" disabled>Play</button>
-      <div id="seek-stack">
-        <div id="time-display">
-          <span id="position">00:00:00.000</span> / <span id="duration">00:00:00.000</span>
+    <header id="top">
+      <button id="play-pause" type="button" disabled aria-label="Play">
+        <svg class="ic ic-play" viewBox="0 0 12 12" width="14" height="14" aria-hidden="true">
+          <path d="M3 2 L10 6 L3 10 Z" fill="currentColor"/>
+        </svg>
+        <svg class="ic ic-pause" viewBox="0 0 12 12" width="14" height="14" aria-hidden="true">
+          <rect x="3" y="2" width="2.5" height="8" fill="currentColor"/>
+          <rect x="6.5" y="2" width="2.5" height="8" fill="currentColor"/>
+        </svg>
+      </button>
+      <div id="info">
+        <div id="info-primary">
+          <span class="meta-part filename" id="md-filename" title=""></span>
+          <span class="meta-part" id="md-type"></span>
+          <span class="meta-part" id="md-size"></span>
         </div>
-        <div id="seek-bar">
-          <canvas id="waveform"></canvas>
-          <div id="spectrogram-wrap"><canvas id="spectrogram"></canvas></div>
-          <div id="playhead"></div>
+        <div id="info-secondary">
+          <div id="info-secondary-meta">
+            <span class="meta-part" id="md-channels"></span>
+            <span class="meta-part" id="md-format"></span>
+          </div>
+          <div id="time-display">
+            <span id="position">00:00.000</span> / <span id="duration">00:00.000</span>
+          </div>
         </div>
-        <div id="metric-tooltip" hidden></div>
+      </div>
+    </header>
+    <div id="seek-bar">
+      <canvas id="waveform"></canvas>
+      <div id="spectrogram-wrap"><canvas id="spectrogram"></canvas></div>
+      <div id="playhead"></div>
+      <div id="stats-sample" hidden>
+        <span class="stat-time" id="s-time">00:00.000</span>
+        <span class="stat"><span class="k">pk</span><span class="v" id="s-peak">—</span></span>
+        <span class="stat"><span class="k">RMS</span><span class="v" id="s-rms">—</span></span>
       </div>
     </div>
-    <dl id="metrics">
-      <div><dt>Sample peak</dt><dd id="m-samplepeak">—</dd></div>
-      <div><dt>True peak</dt><dd id="m-truepeak">—</dd></div>
-      <div><dt>RMS</dt><dd id="m-rms">—</dd></div>
-      <div><dt>Crest</dt><dd id="m-crest">—</dd></div>
-      <div><dt>Clipping</dt><dd id="m-clipping">—</dd></div>
-      <div><dt>Integrated LUFS</dt><dd id="m-i">—</dd></div>
-      <div><dt>LRA</dt><dd id="m-lra">—</dd></div>
-    </dl>
+    <footer id="stats">
+      <div id="stats-global">
+        <span class="stat"><span class="k">SP</span><span class="v" id="m-samplepeak">—</span></span>
+        <span class="stat"><span class="k">TP</span><span class="v" id="m-truepeak">—</span></span>
+        <span class="stat"><span class="k">RMS</span><span class="v" id="m-rms">—</span></span>
+        <span class="stat"><span class="k">LUFS</span><span class="v" id="m-i">—</span></span>
+      </div>
+    </footer>
     <script type="module" src="/src/client/app.ts"></script>
   </body>
 </html>

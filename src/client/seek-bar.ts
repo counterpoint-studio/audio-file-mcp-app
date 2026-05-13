@@ -57,8 +57,14 @@ export function createSeekBar(
         setProgress(p);
     };
 
+    const isPlayPauseTarget = (target: EventTarget | null): boolean => {
+        if (!(target instanceof Element)) return false;
+        return target.closest("#play-pause") !== null;
+    };
+
     const onPointerDown = (e: PointerEvent) => {
         if (e.button !== 0) return;
+        if (isPlayPauseTarget(e.target)) return;
         const { duration } = audio;
         if (!Number.isFinite(duration) || duration <= 0) return;
         seekBarEl.setPointerCapture(e.pointerId);
@@ -74,12 +80,13 @@ export function createSeekBar(
     };
 
     const onPointerUpOrCancel = (e: PointerEvent) => {
+        if (!scrubbing) return;
         if (seekBarEl.hasPointerCapture(e.pointerId)) {
             seekBarEl.releasePointerCapture(e.pointerId);
         }
         scrubbing = false;
-        if (wasPlayingBeforeScrub) {
-            wasPlayingBeforeScrub = false;
+        wasPlayingBeforeScrub = false;
+        if (e.type !== "pointercancel") {
             void audio.play();
         }
     };

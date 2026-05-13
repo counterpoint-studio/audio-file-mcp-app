@@ -9,33 +9,15 @@ const MIN_HZ = 20;
 const FLOOR_DB = -100;
 const CEIL_DB = 0;
 
-const VIRIDIS: ReadonlyArray<readonly [number, number, number]> = [
-    [68, 1, 84],
-    [72, 35, 116],
-    [64, 67, 135],
-    [52, 94, 141],
-    [41, 120, 142],
-    [32, 144, 140],
-    [34, 167, 132],
-    [68, 190, 112],
-    [121, 209, 81],
-    [189, 222, 38],
-    [253, 231, 36],
-];
-
 function makeColorLut(): Uint8ClampedArray {
     const lut = new Uint8ClampedArray(256 * 4);
+    // Silence → near-surface (#fafafa-ish), peak → near-black (#141414).
     for (let i = 0; i < 256; i++) {
         const t = i / 255;
-        const scaled = t * (VIRIDIS.length - 1);
-        const i0 = Math.floor(scaled);
-        const i1 = Math.min(VIRIDIS.length - 1, i0 + 1);
-        const f = scaled - i0;
-        const a = VIRIDIS[i0];
-        const b = VIRIDIS[i1];
-        lut[i * 4 + 0] = a[0] + (b[0] - a[0]) * f;
-        lut[i * 4 + 1] = a[1] + (b[1] - a[1]) * f;
-        lut[i * 4 + 2] = a[2] + (b[2] - a[2]) * f;
+        const v = Math.round(250 - 230 * t);
+        lut[i * 4 + 0] = v;
+        lut[i * 4 + 1] = v;
+        lut[i * 4 + 2] = v;
         lut[i * 4 + 3] = 255;
     }
     return lut;

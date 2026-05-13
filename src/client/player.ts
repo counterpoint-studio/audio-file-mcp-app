@@ -38,20 +38,20 @@ export function createPlayer(
         }
     };
 
-    const onPlay = () => {
-        button.textContent = "Pause";
+    const setPlaying = (playing: boolean) => {
+        button.classList.toggle("is-playing", playing);
+        button.setAttribute("aria-label", playing ? "Pause" : "Play");
     };
 
-    const onPause = () => {
-        button.textContent = "Play";
-    };
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
 
     button.addEventListener("click", onClick);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
 
     button.disabled = false;
-    button.textContent = "Play";
+    setPlaying(false);
 
     return {
         audio,
@@ -71,7 +71,7 @@ export function createPlayer(
             audio.removeAttribute("src");
             audio.load();
             button.disabled = true;
-            button.textContent = "Play";
+            setPlaying(false);
         },
     };
 }

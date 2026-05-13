@@ -46,18 +46,14 @@ export function createTimeDisplay(
     };
 }
 
-function formatTime(seconds: number): string {
-    if (!Number.isFinite(seconds) || seconds < 0) return "00:00:00.000";
+export function formatTime(seconds: number): string {
+    if (!Number.isFinite(seconds) || seconds < 0) return "00:00.000";
     const totalMs = Math.floor(seconds * 1000);
     const ms = totalMs % 1000;
     const totalSec = Math.floor(totalMs / 1000);
     const sec = totalSec % 60;
-    const totalMin = Math.floor(totalSec / 60);
-    const min = totalMin % 60;
-    const hr = Math.floor(totalMin / 60);
+    const min = Math.floor(totalSec / 60);
     return (
-        hr.toString().padStart(2, "0") +
-        ":" +
         min.toString().padStart(2, "0") +
         ":" +
         sec.toString().padStart(2, "0") +

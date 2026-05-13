@@ -1,11 +1,10 @@
 import {
     PLACEHOLDER,
-    formatCrest,
     formatDb,
     formatDbFromLinear,
-    formatLu,
     formatLufs,
 } from "./metrics-format";
+import { formatTime } from "./time-display";
 
 export type LiveMetrics = {
     samplePeak: number;
@@ -18,7 +17,7 @@ export type LiveMetrics = {
     clipping: number;
 };
 
-export type TooltipValues = {
+export type SampleValues = {
     samplePeak: number;
     rms: number;
     truePeak: number;
@@ -29,14 +28,17 @@ export type TooltipValues = {
 
 export type Metrics = { destroy(): void };
 
-type Cells = {
+type GlobalCells = {
     samplePeak: HTMLElement;
     truePeak: HTMLElement;
     rms: HTMLElement;
-    crest: HTMLElement;
-    clipping: HTMLElement;
     integrated: HTMLElement;
-    lra: HTMLElement;
+};
+
+type SampleCells = {
+    time: HTMLElement;
+    peak: HTMLElement;
+    rms: HTMLElement;
 };
 
 export function createMetrics(
@@ -44,12 +46,13 @@ export function createMetrics(
     seekBarEl: HTMLElement,
     audio: HTMLAudioElement,
 ): Metrics {
-    const cells = readCells();
-    const tooltip = document.querySelector<HTMLDivElement>("#metric-tooltip");
-    if (!tooltip) throw new Error("#metric-tooltip missing");
+    const globalCells = readGlobalCells();
+    const sampleCells = readSampleCells();
+    const samplesPanel = requireEl("#stats-sample");
 
-    resetCells(cells);
-    tooltip.hidden = true;
+    resetGlobal(globalCells);
+    resetSample(sampleCells);
+    samplesPanel.hidden = true;
 
     let nextQueryId = 1;
     let pendingQueryId = 0;
@@ -58,10 +61,10 @@ export function createMetrics(
         const data = e.data;
         if (!data || typeof data !== "object") return;
         if (data.type === "live-metrics" || data.type === "final-metrics") {
-            renderCells(cells, data.metrics as LiveMetrics);
+            renderGlobal(globalCells, data.metrics as LiveMetrics);
         } else if (data.type === "query-result") {
             if (data.id !== pendingQueryId) return;
-            renderTooltip(tooltip, data.values as TooltipValues);
+            renderSample(sampleCells, data.values as SampleValues);
         }
     };
     worker.addEventListener("message", onMessage);
@@ -73,28 +76,22 @@ export function createMetrics(
         const t = Math.max(0, Math.min(1, x / rect.width));
         const duration = audio.duration;
         if (!Number.isFinite(duration) || duration <= 0) {
-            tooltip.hidden = true;
+            samplesPanel.hidden = true;
             return;
         }
-        tooltip.hidden = false;
-        // Position within seek-stack (the tooltip's offsetParent); seek-bar
-        // is the only horizontally-stretched flex child, so x relative to the
-        // seek-bar matches x relative to the stack.
-        const halfW = tooltip.offsetWidth / 2;
-        const stackWidth = tooltip.offsetParent?.clientWidth ?? rect.width;
-        const clampedX = Math.max(halfW, Math.min(stackWidth - halfW, x));
-        tooltip.style.left = `${clampedX}px`;
-        tooltip.style.top = `${seekBarEl.offsetTop}px`;
+        const seconds = t * duration;
+        samplesPanel.hidden = false;
+        sampleCells.time.textContent = formatTime(seconds);
         pendingQueryId = nextQueryId++;
         worker.postMessage({
             type: "queryAt",
             id: pendingQueryId,
-            seconds: t * duration,
+            seconds,
         });
     };
 
     const onPointerLeave = () => {
-        tooltip.hidden = true;
+        samplesPanel.hidden = true;
         pendingQueryId = 0;
     };
 
@@ -106,22 +103,27 @@ export function createMetrics(
             worker.removeEventListener("message", onMessage);
             seekBarEl.removeEventListener("pointermove", onPointerMove);
             seekBarEl.removeEventListener("pointerleave", onPointerLeave);
-            tooltip.hidden = true;
-            tooltip.textContent = "";
-            resetCells(cells);
+            samplesPanel.hidden = true;
+            resetGlobal(globalCells);
+            resetSample(sampleCells);
         },
     };
 }
 
-function readCells(): Cells {
+function readGlobalCells(): GlobalCells {
     return {
         samplePeak: requireEl("#m-samplepeak"),
         truePeak: requireEl("#m-truepeak"),
         rms: requireEl("#m-rms"),
-        crest: requireEl("#m-crest"),
-        clipping: requireEl("#m-clipping"),
         integrated: requireEl("#m-i"),
-        lra: requireEl("#m-lra"),
+    };
+}
+
+function readSampleCells(): SampleCells {
+    return {
+        time: requireEl("#s-time"),
+        peak: requireEl("#s-peak"),
+        rms: requireEl("#s-rms"),
     };
 }
 
@@ -131,38 +133,38 @@ function requireEl(sel: string): HTMLElement {
     return el;
 }
 
-function resetCells(c: Cells): void {
+function resetGlobal(c: GlobalCells): void {
     c.samplePeak.textContent = PLACEHOLDER;
     c.truePeak.textContent = PLACEHOLDER;
     c.rms.textContent = PLACEHOLDER;
-    c.crest.textContent = PLACEHOLDER;
-    c.clipping.textContent = PLACEHOLDER;
     c.integrated.textContent = PLACEHOLDER;
-    c.lra.textContent = PLACEHOLDER;
 }
 
-function renderCells(c: Cells, m: LiveMetrics): void {
+function resetSample(c: SampleCells): void {
+    c.time.textContent = formatTime(0);
+    c.peak.textContent = PLACEHOLDER;
+    c.rms.textContent = PLACEHOLDER;
+}
+
+function renderGlobal(c: GlobalCells, m: LiveMetrics): void {
     c.samplePeak.textContent = formatDbFromLinear(m.samplePeak);
     c.truePeak.textContent = formatDb(m.truePeak);
     c.rms.textContent = formatDbFromLinear(m.rms);
-    c.crest.textContent = formatCrest(m.samplePeak, m.rms);
-    c.clipping.textContent = Number.isFinite(m.clipping) ? String(m.clipping) : PLACEHOLDER;
     c.integrated.textContent = formatLufs(m.integrated);
-    c.lra.textContent = formatLu(m.lra);
 }
 
-function renderTooltip(el: HTMLDivElement, v: TooltipValues): void {
+function renderSample(c: SampleCells, v: SampleValues): void {
     if (!v) {
-        el.textContent = PLACEHOLDER;
+        c.peak.textContent = PLACEHOLDER;
+        c.rms.textContent = PLACEHOLDER;
         return;
     }
-    const lines = [
-        `peak ${formatDbFromLinear(v.samplePeak)}`,
-        `rms  ${formatDbFromLinear(v.rms)}`,
-        `M    ${formatDb(v.momentary)}`,
-        `S    ${formatDb(v.shortTerm)}`,
-        `clip ${v.clipping}`,
-    ];
-    el.textContent = lines.join("\n");
+    c.peak.textContent = compactDbFromLinear(v.samplePeak);
+    c.rms.textContent = compactDbFromLinear(v.rms);
 }
 
+function compactDbFromLinear(linear: number): string {
+    if (Number.isNaN(linear)) return PLACEHOLDER;
+    if (!Number.isFinite(linear) || linear === 0) return "-∞dB";
+    return `${(20 * Math.log10(Math.abs(linear))).toFixed(1)}dB`;
+}

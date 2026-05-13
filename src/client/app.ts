@@ -12,7 +12,7 @@ import { createPlayer, type Player } from "./player";
 import { extractMetadata } from "./metadata";
 import { createMetadataDisplay, type MetadataDisplay } from "./metadata-display";
 
-const metadataEl = document.querySelector("#metadata") as HTMLElement;
+const metadataEl = document.querySelector("#info") as HTMLElement;
 const playPauseBtn = document.querySelector("#play-pause") as HTMLButtonElement;
 const seekBarEl = document.querySelector("#seek-bar") as HTMLElement;
 const positionEl = document.querySelector("#position") as HTMLElement;
