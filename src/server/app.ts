@@ -10,6 +10,7 @@ import {
 import fs from "node:fs/promises";
 import path from "node:path";
 import * as z from "zod";
+import { normalizeIncomingPath } from "./path-utils.js";
 
 const server = new McpServer({
   name: "Audio File MCP App",
@@ -30,8 +31,12 @@ registerAppTool(
     _meta: { ui: { resourceUri } },
   },
   async ({ path }) => {
+    const normalized = normalizeIncomingPath(path);
+    if (!normalized) {
+      throw new Error("Path parameter is required");
+    }
     return {
-      content: [{ type: "text", text: path }],
+      content: [{ type: "text", text: normalized }],
     };
   },
 );
@@ -66,7 +71,10 @@ server.registerResource(
         if (!pathStrRaw) {
             throw new Error("Path parameter is required");
         }
-        const pathStr = decodeURIComponent(pathStrRaw);
+        const pathStr = normalizeIncomingPath(decodeURIComponent(pathStrRaw));
+        if (!pathStr) {
+            throw new Error("Path parameter is required");
+        }
         const exists = await fs.stat(pathStr).then(() => true).catch(() => false);
         if (!exists) {
             throw new Error(`File not found: ${pathStr}`);
