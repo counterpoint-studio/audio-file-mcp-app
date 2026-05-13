@@ -7,6 +7,15 @@ export type LoopRegion = {
     destroy(): void;
 };
 
+// Neutral name so the observer reads as "region selection" rather than
+// "loop region" — the model-context layer never frames the selection as a
+// loop, even though this module name reflects its original use.
+export type RegionObserver = {
+    onPreview?(startSec: number, endSec: number): void;
+    onCommit?(startSec: number, endSec: number): void;
+    onCleared?(): void;
+};
+
 export function normalizeRegion(p1: number, p2: number): { start: number; end: number } {
     const a = Math.max(0, Math.min(1, p1));
     const b = Math.max(0, Math.min(1, p2));
@@ -31,6 +40,7 @@ export function createLoopRegion(
     statsEl: HTMLElement,
     startEl: HTMLElement,
     endEl: HTMLElement,
+    observer?: RegionObserver,
 ): LoopRegion {
     let rafId = 0;
     let loopStartSec = 0;
@@ -89,6 +99,7 @@ export function createLoopRegion(
                 startEl.textContent = formatTime(start * duration);
                 endEl.textContent = formatTime(end * duration);
                 statsEl.hidden = false;
+                observer?.onPreview?.(start * duration, end * duration);
             }
         },
         setRegion(startSec, endSec) {
@@ -111,6 +122,7 @@ export function createLoopRegion(
             endEl.textContent = formatTime(end);
             statsEl.hidden = false;
             startRaf();
+            observer?.onCommit?.(start, end);
         },
         clearRegion() {
             audio.loop = true;
@@ -123,6 +135,7 @@ export function createLoopRegion(
             loopEndSec = 0;
             hasRegion = false;
             stopRaf();
+            observer?.onCleared?.();
         },
         destroy() {
             stopRaf();

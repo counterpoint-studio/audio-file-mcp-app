@@ -11,6 +11,10 @@ import { base64ToBlob } from "./base64-blob";
 import { createPlayer, type Player } from "./player";
 import { extractMetadata } from "./metadata";
 import { createMetadataDisplay, type MetadataDisplay } from "./metadata-display";
+import {
+    createAudioContextPublisher,
+    type AudioContextPublisher,
+} from "./audio-context-publisher";
 
 const metadataEl = document.querySelector("#info") as HTMLElement;
 const playPauseBtn = document.querySelector("#play-pause") as HTMLButtonElement;
@@ -28,6 +32,7 @@ type AudioState = {
     url: string;
     player: Player;
     display: MetadataDisplay;
+    publisher: AudioContextPublisher;
 };
 type LoadedAudio = {
     blob: Blob;
@@ -44,39 +49,72 @@ app.ontoolresult = async (result) => {
 
     const myGen = ++loadGen;
     releaseCurrent();
+    playPauseBtn.classList.add("is-loading");
 
-    const loaded = await loadAudio(filePath, () => myGen === loadGen);
-    if (myGen !== loadGen || loaded === null) return;
+    try {
+        const loaded = await loadAudio(filePath, () => myGen === loadGen);
+        if (myGen !== loadGen || loaded === null) return;
 
-    const { blob, format, decodeFormat } = loaded;
-    const metadata = await extractMetadata(format, blob);
-    if (myGen !== loadGen) return;
+        const { blob, format, decodeFormat } = loaded;
+        const metadata = await extractMetadata(format, blob);
+        if (myGen !== loadGen) return;
 
-    const durationSeconds = metadata?.duration ?? null;
-    const durationExact = metadata?.durationExact ?? false;
+        const durationSeconds = metadata?.duration ?? null;
+        const durationExact = metadata?.durationExact ?? false;
 
-    const url = URL.createObjectURL(blob);
-    const player = createPlayer(
-        url,
-        blob,
-        decodeFormat,
-        playPauseBtn,
-        seekBarEl,
-        positionEl,
-        durationEl,
-        spectrogramWrapEl,
-        durationSeconds,
-        durationExact,
-    );
-    const display = createMetadataDisplay(metadataEl, player.worker);
-    display.update(metadata, filePath);
-    currentAudio = { path: filePath, blob, url, player, display };
+        const url = URL.createObjectURL(blob);
+        const publisher = createAudioContextPublisher(app);
+        publisher.setFile(filePath);
+        publisher.setMetadata(metadata);
+        publisher.setDurationSeconds(durationSeconds);
+        publisher.setPlayback("paused");
+        publisher.setPosition(0, null);
+
+        const player = createPlayer(
+            url,
+            blob,
+            decodeFormat,
+            playPauseBtn,
+            seekBarEl,
+            positionEl,
+            durationEl,
+            spectrogramWrapEl,
+            durationSeconds,
+            durationExact,
+            {
+                onPlayback: (playing) =>
+                    publisher.setPlayback(playing ? "playing" : "paused"),
+                onPosition: (seconds, samples) =>
+                    publisher.setPosition(seconds, samples),
+                onLiveMetrics: (m) =>
+                    publisher.setGlobalMetrics({
+                        samplePeak: m.samplePeak,
+                        rms: m.rms,
+                        truePeakDb: m.truePeak,
+                        integratedLufs: m.integrated,
+                    }),
+                onDecoderInfo: (channels, sampleRate) =>
+                    publisher.setDecoderInfo({ channels, sampleRate }),
+                onRegionPreview: (a, b) => publisher.setRegionPreview(a, b),
+                onRegion: (a, b) => publisher.setRegion(a, b),
+                onRegionCleared: () => publisher.clearRegion(),
+            },
+        );
+        const display = createMetadataDisplay(metadataEl, player.worker);
+        display.update(metadata, filePath);
+        currentAudio = { path: filePath, blob, url, player, display, publisher };
+    } finally {
+        if (myGen === loadGen) {
+            playPauseBtn.classList.remove("is-loading");
+        }
+    }
 };
 
 function releaseCurrent(): void {
     if (currentAudio) {
         currentAudio.display.destroy();
         currentAudio.player.destroy();
+        currentAudio.publisher.destroy();
         URL.revokeObjectURL(currentAudio.url);
         currentAudio = null;
     }
