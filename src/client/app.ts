@@ -1,5 +1,6 @@
 import "./app.css";
 import { App } from "@modelcontextprotocol/ext-apps";
+import { wireTheme } from "./theme";
 import {
     sniffAudioFormat,
     audioFormatToMime,
@@ -24,7 +25,8 @@ const durationEl = document.querySelector("#duration") as HTMLElement;
 const spectrogramWrapEl = document.querySelector("#spectrogram-wrap") as HTMLElement;
 
 const app = new App({ name: "Audio File App", version: "1.0.0" });
-app.connect();
+const connected = app.connect();
+wireTheme(app, connected);
 
 type AudioState = {
     path: string;

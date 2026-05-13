@@ -28,7 +28,10 @@ type InitMsg = {
     format: AudioDecodeFormat | null;
     durationSeconds: number | null;
     durationExact: boolean;
+    theme: "light" | "dark";
 };
+
+type ThemeMsg = { type: "theme"; theme: "light" | "dark" };
 
 type ResizeMsg = {
     type: "resize";
@@ -59,7 +62,8 @@ type InMsg =
     | ResizeMsg
     | SpectrogramCanvasMsg
     | SpectrogramResizeMsg
-    | QueryAtMsg;
+    | QueryAtMsg
+    | ThemeMsg;
 
 const LIVE_INTERVAL_MS = 250;
 
@@ -103,6 +107,7 @@ self.onmessage = (e: MessageEvent<InMsg>) => {
         case "init":
             initialDuration = msg.durationSeconds;
             initialDurationExact = msg.durationExact;
+            waveform.setTheme(msg.theme);
             waveform.setCanvas(
                 msg.canvas,
                 msg.cssWidth,
@@ -131,6 +136,9 @@ self.onmessage = (e: MessageEvent<InMsg>) => {
             break;
         case "queryAt":
             handleQueryAt(msg.id, msg.seconds);
+            break;
+        case "theme":
+            waveform.setTheme(msg.theme);
             break;
     }
 };

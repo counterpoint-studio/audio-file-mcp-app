@@ -1,5 +1,6 @@
 import WaveformWorker from "./analysis-worker.ts?worker&inline";
 import { type AudioDecodeFormat } from "./audio-formats";
+import { getTheme, subscribeTheme } from "./theme";
 
 export type Waveform = { destroy(): void; worker: Worker };
 
@@ -33,8 +34,13 @@ export function createWaveform(
             format: decodeFormat,
             durationSeconds,
             durationExact,
+            theme: getTheme(),
         },
         [offscreen],
+    );
+
+    const unsubscribeTheme = subscribeTheme((t) =>
+        worker.postMessage({ type: "theme", theme: t }),
     );
 
     let pendingResizeRaf = 0;
@@ -91,6 +97,7 @@ export function createWaveform(
                 pendingResizeRaf = 0;
             }
             dprMql?.removeEventListener("change", onDprChange);
+            unsubscribeTheme();
             worker.removeEventListener("message", onWorkerMessage);
             worker.terminate();
         },

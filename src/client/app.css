@@ -17,6 +17,15 @@
     --spectrogram-h: 60px;
 }
 
+[data-theme="dark"] {
+    --surface: #18181b;
+    --ink: #e7e7ea;
+    --ink-mute: #9a9aa1;
+    --ink-faint: #555558;
+    --seek-bg: #232327;
+    --border: #3a3a40;
+}
+
 html,
 body {
     margin: 0;

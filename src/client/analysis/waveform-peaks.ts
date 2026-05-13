@@ -1,5 +1,10 @@
 import type { Analyzer, AnalyzerChunk } from "./analyzer";
-import { bandEnergyToFillStyle } from "./band-shading";
+import {
+    bandEnergyToFillStyle,
+    waveformPalette,
+    type Theme,
+    type WaveformPalette,
+} from "./band-shading";
 import { GrowablePeaks } from "./growable-peaks";
 import type { WaveformBandEnergyAnalyzer } from "./waveform-band-energy";
 
@@ -18,8 +23,16 @@ export class WaveformPeaksAnalyzer implements Analyzer {
     private cssHeight = 0;
     private durationSeconds: number | null = null;
     private lastRedrawAt = 0;
+    private palette: WaveformPalette = waveformPalette("light");
 
     constructor(private bandEnergy?: WaveformBandEnergyAnalyzer) {}
+
+    setTheme(theme: Theme): void {
+        const next = waveformPalette(theme);
+        if (next === this.palette) return;
+        this.palette = next;
+        this.redraw();
+    }
 
     get peakCount(): number {
         return this.peaks.count;
@@ -138,7 +151,7 @@ export class WaveformPeaksAnalyzer implements Analyzer {
         const ctx = this.ctx;
         if (!ctx) return;
         ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
-        ctx.strokeStyle = "#bbb";
+        ctx.strokeStyle = this.palette.placeholder;
         ctx.beginPath();
         ctx.moveTo(0, this.cssHeight / 2);
         ctx.lineTo(this.cssWidth, this.cssHeight / 2);
@@ -195,9 +208,10 @@ export class WaveformPeaksAnalyzer implements Analyzer {
                 const t1 = ((col + 1) / cssWidth) * totalSeconds;
                 ctx.fillStyle = bandEnergyToFillStyle(
                     this.bandEnergy.queryRange(t0, t1),
+                    this.palette,
                 );
             } else {
-                ctx.fillStyle = "#111";
+                ctx.fillStyle = this.palette.fallback;
             }
             ctx.fillRect(col, yTop, 1, h);
         }
