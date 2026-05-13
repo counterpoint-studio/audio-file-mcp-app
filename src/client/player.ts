@@ -1,4 +1,5 @@
 import { type AudioDecodeFormat } from "./audio-formats";
+import { createLoopRegion, type LoopRegion } from "./loop-region";
 import { createMetrics, type Metrics } from "./metrics";
 import { createSeekBar, type SeekBar } from "./seek-bar";
 import { createSpectrogram, type Spectrogram } from "./spectrogram";
@@ -23,9 +24,23 @@ export function createPlayer(
 ): Player {
     const audio = new Audio(url);
     audio.preload = "auto";
+    audio.loop = true;
+
+    const regionEl = requireChild(seekBarEl, "#loop-region");
+    const regionStatsEl = requireChild(seekBarEl, "#loop-region-stats");
+    const regionStartEl = requireChild(seekBarEl, "#loop-start-time");
+    const regionEndEl = requireChild(seekBarEl, "#loop-end-time");
 
     const timeDisplay: TimeDisplay = createTimeDisplay(audio, positionEl, durationEl);
-    const seekBar: SeekBar = createSeekBar(audio, seekBarEl, timeDisplay.update);
+    const loopRegion: LoopRegion = createLoopRegion(
+        audio,
+        seekBarEl,
+        regionEl,
+        regionStatsEl,
+        regionStartEl,
+        regionEndEl,
+    );
+    const seekBar: SeekBar = createSeekBar(audio, seekBarEl, loopRegion, timeDisplay.update);
     const waveform: Waveform = createWaveform(blob, decodeFormat, audio, seekBarEl);
     const metrics: Metrics = createMetrics(waveform.worker, seekBarEl, audio);
     const spectrogram: Spectrogram = createSpectrogram(waveform.worker, spectrogramWrapEl);
@@ -53,6 +68,12 @@ export function createPlayer(
     button.disabled = false;
     setPlaying(false);
 
+    function requireChild(parent: HTMLElement, selector: string): HTMLElement {
+        const el = parent.querySelector<HTMLElement>(selector);
+        if (!el) throw new Error(`${selector} element missing`);
+        return el;
+    }
+
     return {
         audio,
         worker: waveform.worker,
@@ -62,6 +83,7 @@ export function createPlayer(
             spectrogram.destroy();
             metrics.destroy();
             waveform.destroy();
+            loopRegion.destroy();
             seekBar.destroy();
             timeDisplay.destroy();
             button.removeEventListener("click", onClick);

@@ -205,6 +205,21 @@ body {
     will-change: transform;
 }
 
+#loop-region {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    pointer-events: none;
+    left: calc(var(--loop-start, 0) * 100cqi);
+    width: calc((var(--loop-end, 0) - var(--loop-start, 0)) * 100cqi);
+    z-index: 1;
+}
+
+#loop-region[hidden] {
+    display: none;
+}
+
 #stats {
     display: flex;
     justify-content: space-between;
@@ -239,6 +254,28 @@ body {
 
 #stats-sample .stat-time {
     color: var(--ink);
+}
+
+#loop-region-stats {
+    position: absolute;
+    top: var(--space-1);
+    right: var(--space-2);
+    z-index: 2;
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-1);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    pointer-events: none;
+}
+
+#loop-region-stats[hidden] {
+    display: none;
+}
+
+#loop-region-stats .loop-sep {
+    color: var(--ink-faint);
 }
 
 .stat {

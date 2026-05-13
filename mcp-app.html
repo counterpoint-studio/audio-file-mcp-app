@@ -36,10 +36,16 @@
       <canvas id="waveform"></canvas>
       <div id="spectrogram-wrap"><canvas id="spectrogram"></canvas></div>
       <div id="playhead"></div>
+      <div id="loop-region" hidden></div>
       <div id="stats-sample" hidden>
         <span class="stat-time" id="s-time">00:00.000</span>
         <span class="stat"><span class="k">pk</span><span class="v" id="s-peak">—</span></span>
         <span class="stat"><span class="k">RMS</span><span class="v" id="s-rms">—</span></span>
+      </div>
+      <div id="loop-region-stats" hidden>
+        <span id="loop-start-time">00:00.000</span>
+        <span class="loop-sep">–</span>
+        <span id="loop-end-time">00:00.000</span>
       </div>
     </div>
     <footer id="stats">
