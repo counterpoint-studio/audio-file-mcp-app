@@ -20,6 +20,16 @@ export type PositionSamples = {
     rms: number;
 };
 
+export type DecodeErrorKind =
+    | "unsupported"
+    | "decode-failed"
+    | "playback-unsupported";
+
+export type DecodeError = {
+    kind: DecodeErrorKind;
+    message?: string;
+};
+
 export type ContextState = {
     path: string | null;
     metadata: AudioMetadata | null;
@@ -30,6 +40,7 @@ export type ContextState = {
     positionSeconds: number;
     positionSamples: PositionSamples | null;
     region: { startSeconds: number; endSeconds: number } | null;
+    error: DecodeError | null;
 };
 
 export function emptyContextState(): ContextState {
@@ -43,6 +54,7 @@ export function emptyContextState(): ContextState {
         positionSeconds: 0,
         positionSamples: null,
         region: null,
+        error: null,
     };
 }
 
@@ -96,6 +108,14 @@ export function buildContextMarkdown(state: ContextState): string {
         pushIfFiniteSeconds(lines, "region-end-seconds", state.region.endSeconds);
     }
 
+    if (state.error) {
+        lines.push(`error: ${state.error.kind}`);
+        const msg = sanitizeErrorMessage(state.error.message);
+        if (msg) {
+            lines.push(`error-message: "${msg}"`);
+        }
+    }
+
     lines.push("---");
     lines.push("");
     lines.push(buildNarrative(state, channels, sampleRate, duration));
@@ -135,7 +155,29 @@ function buildNarrative(
         sentences.push(`A region from ${a} s to ${b} s is selected.`);
     }
 
+    if (state.error) {
+        sentences.push(errorSentence(state.error));
+    }
+
     return sentences.join(" ");
+}
+
+function errorSentence(error: DecodeError): string {
+    const base =
+        error.kind === "unsupported"
+            ? "The file format is not supported."
+            : error.kind === "playback-unsupported"
+              ? "Playback of this file is not supported."
+              : "The file could not be decoded.";
+    const msg = sanitizeErrorMessage(error.message);
+    if (!msg) return base;
+    return `${base.slice(0, -1)} (${msg}).`;
+}
+
+function sanitizeErrorMessage(raw: string | undefined): string {
+    if (!raw) return "";
+    const collapsed = raw.replace(/[\r\n\t]+/g, " ").trim();
+    return collapsed.replace(/"/g, '\\"');
 }
 
 function pushIfDefined(lines: string[], key: string, value: string | undefined | null): void {

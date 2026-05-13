@@ -135,6 +135,58 @@ describe("createAudioContextPublisher", () => {
         expect(app.updateModelContext.mock.calls.length).toBe(before);
     });
 
+    it("setError after setFile publishes with error frontmatter and message", () => {
+        const app = makeApp();
+        const pub = createAudioContextPublisher(app);
+        pub.setFile("/x.mp3");
+        pub.setError("decode-failed", "bad header");
+        const last = app.updateModelContext.mock.calls[
+            app.updateModelContext.mock.calls.length - 1
+        ][0];
+        const text = last.content[0].text as string;
+        expect(text).toContain("error: decode-failed");
+        expect(text).toContain('error-message: "bad header"');
+        expect(text).toContain("The file could not be decoded (bad header).");
+    });
+
+    it("clearError drops error keys from the next payload", () => {
+        const app = makeApp();
+        const pub = createAudioContextPublisher(app);
+        pub.setFile("/x.mp3");
+        pub.setError("unsupported");
+        pub.clearError();
+        const last = app.updateModelContext.mock.calls[
+            app.updateModelContext.mock.calls.length - 1
+        ][0];
+        const text = last.content[0].text as string;
+        expect(text).not.toContain("error:");
+        expect(text).not.toContain("error-message:");
+    });
+
+    it("setError before setFile is included in the first published payload", () => {
+        const app = makeApp();
+        const pub = createAudioContextPublisher(app);
+        // Without a path, build produces an empty string, so no send.
+        pub.setError("unsupported");
+        expect(app.updateModelContext).not.toHaveBeenCalled();
+        pub.setFile("/x.bin");
+        const last = app.updateModelContext.mock.calls[
+            app.updateModelContext.mock.calls.length - 1
+        ][0];
+        const text = last.content[0].text as string;
+        expect(text).toContain("error: unsupported");
+    });
+
+    it("destroy then setError is a no-op", () => {
+        const app = makeApp();
+        const pub = createAudioContextPublisher(app);
+        pub.setFile("/x.mp3");
+        const before = app.updateModelContext.mock.calls.length;
+        pub.destroy();
+        pub.setError("decode-failed", "x");
+        expect(app.updateModelContext.mock.calls.length).toBe(before);
+    });
+
     it("skips publish when position rounds to the same 0.01 s with no samples", () => {
         const app = makeApp();
         const pub = createAudioContextPublisher(app, { minIntervalMs: 1000 });

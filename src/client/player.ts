@@ -19,6 +19,11 @@ export type PlayerPositionSamples = {
     rms: number;
 };
 
+export type PlayerDecodeErrorKind =
+    | "unsupported"
+    | "decode-failed"
+    | "playback-unsupported";
+
 export type PlayerObserver = {
     onPlayback?(playing: boolean): void;
     onPosition?(seconds: number, samples: PlayerPositionSamples | null): void;
@@ -27,6 +32,7 @@ export type PlayerObserver = {
     onRegionPreview?(startSec: number, endSec: number): void;
     onRegion?(startSec: number, endSec: number): void;
     onRegionCleared?(): void;
+    onDecodeError?(kind: PlayerDecodeErrorKind, message?: string): void;
 };
 
 export function createPlayer(
@@ -118,6 +124,8 @@ export function createPlayer(
         }
     };
 
+    let destroyed = false;
+
     const onWorkerMessage = (e: MessageEvent) => {
         const data = e.data;
         if (!data || typeof data !== "object") return;
@@ -133,13 +141,28 @@ export function createPlayer(
                     ? { samplePeak: v.samplePeak, rms: v.rms }
                     : null;
             }
+        } else if (data.type === "error") {
+            observer?.onDecodeError?.(
+                "decode-failed",
+                typeof data.message === "string" ? data.message : undefined,
+            );
+        } else if (data.type === "done" && data.reason === "unsupported") {
+            observer?.onDecodeError?.("unsupported");
         }
+    };
+
+    const onAudioError = () => {
+        if (destroyed) return;
+        const err = audio.error;
+        const message = err ? mediaErrorMessage(err) : undefined;
+        observer?.onDecodeError?.("playback-unsupported", message);
     };
 
     button.addEventListener("click", onClick);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("error", onAudioError);
     if (observer) {
         waveform.worker.addEventListener("message", onWorkerMessage);
     }
@@ -159,6 +182,7 @@ export function createPlayer(
         destroy() {
             // Tear down render layers (which may still hold the blob) before
             // the audio detaches and the URL is revoked.
+            destroyed = true;
             if (observer) {
                 waveform.worker.removeEventListener("message", onWorkerMessage);
             }
@@ -172,6 +196,7 @@ export function createPlayer(
             audio.removeEventListener("play", onPlay);
             audio.removeEventListener("pause", onPause);
             audio.removeEventListener("timeupdate", onTimeUpdate);
+            audio.removeEventListener("error", onAudioError);
             audio.pause();
             audio.removeAttribute("src");
             audio.load();
@@ -179,4 +204,19 @@ export function createPlayer(
             setPlaying(false);
         },
     };
+}
+
+function mediaErrorMessage(err: MediaError): string {
+    switch (err.code) {
+        case 1: // MEDIA_ERR_ABORTED
+            return "playback aborted";
+        case 2: // MEDIA_ERR_NETWORK
+            return "network error";
+        case 3: // MEDIA_ERR_DECODE
+            return "decode error";
+        case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+            return "source not supported";
+        default:
+            return err.message || "";
+    }
 }

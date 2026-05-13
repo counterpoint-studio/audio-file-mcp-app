@@ -183,6 +183,62 @@ describe("buildContextMarkdown", () => {
         expect(out).not.toContain("region from");
     });
 
+    it("renders an unsupported-format error with no message", () => {
+        const state: ContextState = {
+            ...emptyContextState(),
+            path: "/x.bin",
+            metadata: { container: "wav", sizeBytes: 42 },
+            error: { kind: "unsupported" },
+        };
+        const out = buildContextMarkdown(state);
+        expect(out).toContain("error: unsupported");
+        expect(out).not.toContain("error-message:");
+        expect(out).toContain("The file format is not supported.");
+    });
+
+    it("renders a decode-failed error with a message", () => {
+        const state: ContextState = {
+            ...emptyContextState(),
+            path: "/x.mp3",
+            metadata: { container: "mp3", sizeBytes: 50 },
+            error: { kind: "decode-failed", message: "bad header" },
+        };
+        const out = buildContextMarkdown(state);
+        expect(out).toContain("error: decode-failed");
+        expect(out).toContain('error-message: "bad header"');
+        expect(out).toContain("The file could not be decoded (bad header).");
+    });
+
+    it("renders a playback-unsupported error", () => {
+        const state: ContextState = {
+            ...emptyContextState(),
+            path: "/x.aac",
+            metadata: { container: "aac", sizeBytes: 100 },
+            error: { kind: "playback-unsupported", message: "source not supported" },
+        };
+        const out = buildContextMarkdown(state);
+        expect(out).toContain("error: playback-unsupported");
+        expect(out).toContain('error-message: "source not supported"');
+        expect(out).toContain(
+            "Playback of this file is not supported (source not supported).",
+        );
+    });
+
+    it("sanitizes error messages with quotes and newlines", () => {
+        const state: ContextState = {
+            ...emptyContextState(),
+            path: "/x.mp3",
+            metadata: { container: "mp3", sizeBytes: 50 },
+            error: { kind: "decode-failed", message: 'oops "bad"\nthing\there' },
+        };
+        const out = buildContextMarkdown(state);
+        expect(out).toContain('error-message: "oops \\"bad\\" thing here"');
+        // Body sentence uses the same sanitized form.
+        expect(out).toContain(
+            'The file could not be decoded (oops \\"bad\\" thing here).',
+        );
+    });
+
     it("distinguishes playing vs paused", () => {
         const base: ContextState = {
             ...emptyContextState(),

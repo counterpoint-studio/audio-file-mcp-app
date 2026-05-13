@@ -3,6 +3,7 @@ import {
     buildContextMarkdown,
     emptyContextState,
     type ContextState,
+    type DecodeErrorKind,
     type GlobalMetrics,
     type PositionSamples,
 } from "./model-context-text";
@@ -24,8 +25,12 @@ export type AudioContextPublisher = {
     setRegionPreview(startSec: number, endSec: number): void;
     setRegion(startSec: number, endSec: number): void;
     clearRegion(): void;
+    setError(kind: DecodeErrorKind, message?: string): void;
+    clearError(): void;
     destroy(): void;
 };
+
+export type { DecodeErrorKind };
 
 export type AudioContextPublisherOpts = {
     minIntervalMs?: number;
@@ -134,6 +139,16 @@ export function createAudioContextPublisher(
         clearRegion(): void {
             if (guard()) return;
             state.region = null;
+            publisher.publish(true);
+        },
+        setError(kind: DecodeErrorKind, message?: string): void {
+            if (guard()) return;
+            state.error = message ? { kind, message } : { kind };
+            publisher.publish(true);
+        },
+        clearError(): void {
+            if (guard()) return;
+            state.error = null;
             publisher.publish(true);
         },
         destroy(): void {

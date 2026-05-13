@@ -79,15 +79,6 @@ export function createWaveform(
     };
     watchDpr();
 
-    const onWorkerMessage = (e: MessageEvent) => {
-        const data = e.data;
-        if (!data || typeof data !== "object") return;
-        if (data.type === "error") {
-            console.warn("[waveform] decode error:", data.message);
-        }
-    };
-    worker.addEventListener("message", onWorkerMessage);
-
     return {
         worker,
         destroy() {
@@ -98,7 +89,6 @@ export function createWaveform(
             }
             dprMql?.removeEventListener("change", onDprChange);
             unsubscribeTheme();
-            worker.removeEventListener("message", onWorkerMessage);
             worker.terminate();
         },
     };

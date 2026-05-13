@@ -23,6 +23,42 @@ const seekBarEl = document.querySelector("#seek-bar") as HTMLElement;
 const positionEl = document.querySelector("#position") as HTMLElement;
 const durationEl = document.querySelector("#duration") as HTMLElement;
 const spectrogramWrapEl = document.querySelector("#spectrogram-wrap") as HTMLElement;
+const headerEl = document.querySelector("#top") as HTMLElement;
+const statsEl = document.querySelector("#stats") as HTMLElement;
+const errorBannerEl = document.querySelector("#error-banner") as HTMLElement;
+const errorDetailEl = errorBannerEl.querySelector(".error-detail") as HTMLElement;
+
+type DecodeErrorKind =
+    | "unsupported"
+    | "decode-failed"
+    | "playback-unsupported";
+
+function renderErrorDetail(kind: DecodeErrorKind, message?: string): string {
+    const base =
+        kind === "unsupported"
+            ? "The file format is not supported."
+            : kind === "playback-unsupported"
+              ? "Playback of this file is not supported in this browser."
+              : "The file could not be decoded.";
+    const msg = message?.replace(/[\r\n\t]+/g, " ").trim();
+    return msg ? `${base.slice(0, -1)} (${msg}).` : base;
+}
+
+function showError(kind: DecodeErrorKind, message?: string): void {
+    headerEl.hidden = true;
+    seekBarEl.hidden = true;
+    statsEl.hidden = true;
+    errorBannerEl.hidden = false;
+    errorDetailEl.textContent = renderErrorDetail(kind, message);
+}
+
+function hideError(): void {
+    headerEl.hidden = false;
+    seekBarEl.hidden = false;
+    statsEl.hidden = false;
+    errorBannerEl.hidden = true;
+    errorDetailEl.textContent = "";
+}
 
 const app = new App({ name: "Audio File App", version: "1.0.0" });
 const connected = app.connect();
@@ -51,10 +87,19 @@ app.ontoolresult = async (result) => {
 
     const myGen = ++loadGen;
     releaseCurrent();
+    hideError();
     playPauseBtn.classList.add("is-loading");
 
     try {
-        const loaded = await loadAudio(filePath, () => myGen === loadGen);
+        let loaded: LoadedAudio | null;
+        try {
+            loaded = await loadAudio(filePath, () => myGen === loadGen);
+        } catch (e) {
+            if (myGen !== loadGen) return;
+            const message = e instanceof Error ? e.message : String(e);
+            showError("decode-failed", message);
+            return;
+        }
         if (myGen !== loadGen || loaded === null) return;
 
         const { blob, format, decodeFormat } = loaded;
@@ -100,6 +145,11 @@ app.ontoolresult = async (result) => {
                 onRegionPreview: (a, b) => publisher.setRegionPreview(a, b),
                 onRegion: (a, b) => publisher.setRegion(a, b),
                 onRegionCleared: () => publisher.clearRegion(),
+                onDecodeError: (kind, message) => {
+                    if (myGen !== loadGen) return;
+                    publisher.setError(kind, message);
+                    showError(kind, message);
+                },
             },
         );
         const display = createMetadataDisplay(metadataEl, player.worker);
