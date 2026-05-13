@@ -1,6 +1,11 @@
 import { createFft, type Fft } from "../dsp/fft";
 import type { Analyzer, AnalyzerChunk } from "./analyzer";
 import { FFT_SIZE, HOP, type FrameConsumer } from "./frame-router";
+import {
+    formatGridLabel,
+    frequencyToY,
+    visibleGridFrequencies,
+} from "./frequency-grid";
 
 const MAX_COLS = 4000;
 const NUM_BINS = 256;
@@ -205,6 +210,52 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "low";
         ctx.drawImage(tmp, 0, 0, decodedCols, NUM_BINS, 0, 0, offsetW, offsetH);
+        ctx.restore();
+
+        this.drawGrid();
+    }
+
+    private drawGrid(): void {
+        const ctx = this.ctx;
+        if (!ctx) return;
+        if (this.sampleRate <= 0) return;
+        if (this.cssWidth <= 0 || this.cssHeight <= 0) return;
+
+        const freqs = visibleGridFrequencies(this.sampleRate);
+        if (freqs.length === 0) return;
+
+        ctx.save();
+        ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+
+        ctx.globalCompositeOperation = "difference";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.25;
+        for (const hz of freqs) {
+            const y = frequencyToY(hz, this.cssHeight, this.sampleRate);
+            if (y === null) continue;
+            const py = Math.round(y) + 0.5;
+            ctx.beginPath();
+            ctx.moveTo(0, py);
+            ctx.lineTo(this.cssWidth, py);
+            ctx.stroke();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "7px ui-monospace, SFMono-Regular, Menlo, monospace";
+        ctx.textBaseline = "middle";
+        const inset = 4;
+        for (const hz of freqs) {
+            const y = frequencyToY(hz, this.cssHeight, this.sampleRate);
+            if (y === null) continue;
+            const label = formatGridLabel(hz);
+            ctx.textAlign = "left";
+            ctx.fillText(label, inset, y);
+            ctx.textAlign = "right";
+            ctx.fillText(label, this.cssWidth - inset, y);
+        }
+
         ctx.restore();
     }
 
