@@ -35,11 +35,24 @@ export function parseFlac(bytes: Uint8Array): ParseResult {
     const sampleRate = (b10 << 12) | (b11 << 4) | (b12 >> 4);
     const channels = ((b12 >> 1) & 0x07) + 1;
     const bitDepth = (((b12 & 0x01) << 4) | (b13 >> 4)) + 1;
-    return {
+    const samplesTop4 = b13 & 0x0f;
+    const b14 = bytes[p + 14];
+    const b15 = bytes[p + 15];
+    const b16 = bytes[p + 16];
+    const b17 = bytes[p + 17];
+    const samplesLow32 =
+        b14 * 0x1000000 + (b15 << 16) + (b16 << 8) + b17;
+    const totalSamples = samplesTop4 * 0x100000000 + samplesLow32;
+    const result: NonNullable<ParseResult> = {
         channels,
         channelLayout: channelLayoutFor(channels),
         sampleRate,
         bitDepth,
         sampleFormat: "pcm-int",
     };
+    if (totalSamples > 0 && sampleRate > 0) {
+        result.duration = totalSamples / sampleRate;
+        result.durationExact = true;
+    }
+    return result;
 }

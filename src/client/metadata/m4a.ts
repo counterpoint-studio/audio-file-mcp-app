@@ -196,5 +196,28 @@ export function parseM4a(bytes: Uint8Array): ParseResult {
         },
     );
 
+    if (result) {
+        let mvhdDuration = 0;
+        let mvhdTimescale = 0;
+        descendInto(["moov", "mvhd"])(bytes, dv, 0, bytes.byteLength, (_t, ps, pe) => {
+            if (ps + 4 > pe) return;
+            const version = bytes[ps];
+            if (version === 1) {
+                if (ps + 4 + 16 + 4 + 8 > pe) return;
+                mvhdTimescale = dv.getUint32(ps + 4 + 16, false);
+                mvhdDuration = readUint64BE(dv, ps + 4 + 20);
+            } else {
+                if (ps + 4 + 8 + 4 + 4 > pe) return;
+                mvhdTimescale = dv.getUint32(ps + 4 + 8, false);
+                mvhdDuration = dv.getUint32(ps + 4 + 12, false);
+            }
+            return true;
+        });
+        if (mvhdTimescale > 0 && mvhdDuration > 0) {
+            (result as NonNullable<ParseResult>).duration =
+                mvhdDuration / mvhdTimescale;
+            (result as NonNullable<ParseResult>).durationExact = true;
+        }
+    }
     return result;
 }

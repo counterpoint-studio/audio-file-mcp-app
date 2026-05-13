@@ -21,6 +21,8 @@ export function createPlayer(
     positionEl: HTMLElement,
     durationEl: HTMLElement,
     spectrogramWrapEl: HTMLElement,
+    durationSeconds: number | null,
+    durationExact: boolean,
 ): Player {
     const audio = new Audio(url);
     audio.preload = "auto";
@@ -41,7 +43,13 @@ export function createPlayer(
         regionEndEl,
     );
     const seekBar: SeekBar = createSeekBar(audio, seekBarEl, loopRegion, timeDisplay.update);
-    const waveform: Waveform = createWaveform(blob, decodeFormat, audio, seekBarEl);
+    const waveform: Waveform = createWaveform(
+        blob,
+        decodeFormat,
+        seekBarEl,
+        durationSeconds,
+        durationExact,
+    );
     const metrics: Metrics = createMetrics(waveform.worker, seekBarEl, audio);
     const spectrogram: Spectrogram = createSpectrogram(waveform.worker, spectrogramWrapEl);
 

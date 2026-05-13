@@ -15,6 +15,7 @@ import {
     STREAMABLE_DECODE_FORMATS,
     type AudioDecodeFormat,
 } from "./audio-formats";
+import { shouldApplyFinalDuration } from "./analysis/duration-correction";
 import { instantiate as instantiateDsp } from "./dsp/wasm-dsp.gen";
 
 type InitMsg = {
@@ -25,6 +26,8 @@ type InitMsg = {
     dpr: number;
     blob: Blob;
     format: AudioDecodeFormat | null;
+    durationSeconds: number | null;
+    durationExact: boolean;
 };
 
 type ResizeMsg = {
@@ -49,8 +52,6 @@ type SpectrogramResizeMsg = {
     dpr: number;
 };
 
-type DurationMsg = { type: "duration"; seconds: number };
-
 type QueryAtMsg = { type: "queryAt"; id: number; seconds: number };
 
 type InMsg =
@@ -58,7 +59,6 @@ type InMsg =
     | ResizeMsg
     | SpectrogramCanvasMsg
     | SpectrogramResizeMsg
-    | DurationMsg
     | QueryAtMsg;
 
 const LIVE_INTERVAL_MS = 250;
@@ -94,17 +94,25 @@ const dspReady = instantiateDsp();
 let loudnessSummary: LoudnessSummary | null = null;
 let decodeAbort = false;
 let lastLivePostAt = 0;
+let initialDuration: number | null = null;
+let initialDurationExact = false;
 
 self.onmessage = (e: MessageEvent<InMsg>) => {
     const msg = e.data;
     switch (msg.type) {
         case "init":
+            initialDuration = msg.durationSeconds;
+            initialDurationExact = msg.durationExact;
             waveform.setCanvas(
                 msg.canvas,
                 msg.cssWidth,
                 msg.cssHeight,
                 msg.dpr,
             );
+            if (initialDuration !== null) {
+                waveform.setDuration(initialDuration);
+                spectrogram.setDuration(initialDuration);
+            }
             void startDecode(msg.blob, msg.format);
             break;
         case "resize":
@@ -120,10 +128,6 @@ self.onmessage = (e: MessageEvent<InMsg>) => {
             break;
         case "spectrogram-resize":
             spectrogram.resize(msg.cssWidth, msg.cssHeight, msg.dpr);
-            break;
-        case "duration":
-            waveform.setDuration(msg.seconds);
-            spectrogram.setDuration(msg.seconds);
             break;
         case "queryAt":
             handleQueryAt(msg.id, msg.seconds);
@@ -151,11 +155,20 @@ async function runStreaming(
 ): Promise<void> {
     const decoder = streamingDecoder(format);
     const stream = blob.stream();
+    let lastYieldAt = performance.now();
     for await (const chunk of decoder(stream)) {
         if (decodeAbort) return;
         pipeline.feed(chunk);
         maybePostDecoderInfo();
         maybePostLive();
+        // Yield to the macrotask queue periodically so OffscreenCanvas commits
+        // reach the displayed placeholder canvas during decode rather than only
+        // after the for-await loop returns.
+        const now = performance.now();
+        if (now - lastYieldAt >= 16) {
+            lastYieldAt = now;
+            await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
     }
 }
 
@@ -182,6 +195,7 @@ async function startDecode(
             maybePostLive();
         }
         pipeline.finalize();
+        applyFinalDuration();
         loudnessSummary = loudness.summary();
         postLive();
         postFinal();
@@ -195,6 +209,17 @@ async function startDecode(
             type: "error",
             message: err instanceof Error ? err.message : String(err),
         });
+    }
+}
+
+function applyFinalDuration(): void {
+    const sr = pipeline.sampleRateObserved;
+    const samples = pipeline.totalSamples;
+    if (sr <= 0 || samples <= 0) return;
+    const actual = samples / sr;
+    if (shouldApplyFinalDuration(initialDuration, initialDurationExact, actual)) {
+        waveform.setDuration(actual);
+        spectrogram.setDuration(actual);
     }
 }
 

@@ -13,6 +13,7 @@ import { parseAac } from "./aac";
 import { parseM4a } from "./m4a";
 import { parseWebm } from "./webm";
 import { parseWma } from "./wma";
+import { computeEstimatedDuration } from "./effective-bitrate";
 
 type Parser = (bytes: Uint8Array) => ParseResult;
 
@@ -41,11 +42,19 @@ export async function extractMetadata(
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const parser = PARSERS[format];
     const parsed = parser ? parser(bytes) : null;
-    return {
+    const meta: AudioMetadata = {
         container: format,
         sizeBytes: bytes.byteLength,
         ...(parsed ?? {}),
     };
+    if (meta.duration === undefined && meta.bitrate !== undefined) {
+        const est = computeEstimatedDuration(meta.sizeBytes, meta.bitrate);
+        if (est !== undefined) {
+            meta.duration = est;
+            meta.durationExact = false;
+        }
+    }
+    return meta;
 }
 
 export type { AudioMetadata, SampleFormat, BitrateMode, ParseResult } from "./types";

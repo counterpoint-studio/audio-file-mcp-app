@@ -156,12 +156,15 @@ export class WaveformPeaksAnalyzer implements Analyzer {
             1,
             Math.round(this.durationSeconds * PEAKS_PER_SECOND),
         );
+        // Map buckets → columns against the *full timeline*, not the
+        // currently-decoded prefix. Otherwise the grouping reshuffles on every
+        // redraw and the waveform visibly shimmers as more chunks arrive.
+        const bucketsPerColumn = totalBuckets / this.cssWidth;
         const decodedColumns = Math.min(
             this.cssWidth,
-            Math.ceil((decodedBuckets / totalBuckets) * this.cssWidth),
+            Math.floor(decodedBuckets / bucketsPerColumn),
         );
         if (decodedColumns <= 0) return;
-        const bucketsPerColumn = decodedBuckets / decodedColumns;
         const cy = this.cssHeight / 2;
         const halfH = this.cssHeight / 2 - 1;
 

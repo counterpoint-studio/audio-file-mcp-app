@@ -17,6 +17,8 @@ describe("parseOgg", () => {
             expect(m.bitrate).toBeGreaterThan(0);
             expect(m.bitrateExact).toBe(true);
         }
+        expect(m?.duration).toBeCloseTo(0.5, 2);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("parses Opus ID page (44.1k source — ffmpeg's libopus writes InputSampleRate=48000 regardless)", () => {
@@ -30,6 +32,8 @@ describe("parseOgg", () => {
         // Opus doesn't store target bitrate.
         expect(m?.bitrate).toBeUndefined();
         expect(m?.inputSampleRate).toBe(48000);
+        expect(m?.duration).toBeCloseTo(0.5, 2);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("parses Opus with InputSampleRate=48000", () => {

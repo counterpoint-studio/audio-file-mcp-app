@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseAmr } from "./amr";
+import { extractMetadata } from "./index";
 import { loadFixture } from "./__fixtures__/load";
 
 describe("parseAmr", () => {
@@ -27,5 +28,13 @@ describe("parseAmr", () => {
 
     it("returns null for non-AMR bytes", () => {
         expect(parseAmr(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]))).toBeNull();
+    });
+
+    it("estimates duration via extractMetadata from mode-derived bitrate", async () => {
+        const bytes = loadFixture("amr-nb-mono-8000.amr");
+        const blob = new Blob([bytes]);
+        const m = await extractMetadata("amr", blob);
+        expect(m?.duration).toBeGreaterThan(0);
+        expect(m?.durationExact).toBe(false);
     });
 });

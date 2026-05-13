@@ -53,6 +53,9 @@ export function parseWav(bytes: Uint8Array): ParseResult {
 
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let offset = 12;
+    let result: NonNullable<ParseResult> | null = null;
+    let avgBytesPerSec = 0;
+    let dataChunkSize = 0;
     while (offset + 8 <= bytes.byteLength) {
         const chunkId =
             String.fromCharCode(bytes[offset]) +
@@ -60,12 +63,13 @@ export function parseWav(bytes: Uint8Array): ParseResult {
             String.fromCharCode(bytes[offset + 2]) +
             String.fromCharCode(bytes[offset + 3]);
         const chunkSize = dv.getUint32(offset + 4, littleEndian);
-        if (chunkId === "fmt ") {
+        if (chunkId === "fmt " && !result) {
             if (offset + 8 + 16 > bytes.byteLength) return null;
             const p = offset + 8;
             let formatTag = dv.getUint16(p, littleEndian);
             const channels = dv.getUint16(p + 2, littleEndian);
             const sampleRate = dv.getUint32(p + 4, littleEndian);
+            avgBytesPerSec = dv.getUint32(p + 8, littleEndian);
             const bitsPerSample = dv.getUint16(p + 14, littleEndian);
             if (formatTag === WAVE_FORMAT_EXTENSIBLE && chunkSize >= 40) {
                 // SubFormat GUID first 2 bytes carry the real format tag.
@@ -73,7 +77,7 @@ export function parseWav(bytes: Uint8Array): ParseResult {
                 formatTag = subFormatTag;
             }
             const mapped = formatToSample(formatTag);
-            const result: NonNullable<ParseResult> = {
+            result = {
                 channels,
                 channelLayout: channelLayoutFor(channels),
                 sampleRate,
@@ -86,10 +90,16 @@ export function parseWav(bytes: Uint8Array): ParseResult {
                 if (bitsPerSample > 0) result.bitDepth = bitsPerSample;
             }
             if (mapped.codec) result.codec = mapped.codec;
-            return result;
+        } else if (chunkId === "data") {
+            dataChunkSize = chunkSize;
+            break;
         }
         // Chunks are 2-byte aligned in RIFF.
         offset += 8 + chunkSize + (chunkSize & 1);
     }
-    return null;
+    if (result && dataChunkSize > 0 && avgBytesPerSec > 0) {
+        result.duration = dataChunkSize / avgBytesPerSec;
+        result.durationExact = true;
+    }
+    return result;
 }

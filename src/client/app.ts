@@ -49,6 +49,12 @@ app.ontoolresult = async (result) => {
     if (myGen !== loadGen || loaded === null) return;
 
     const { blob, format, decodeFormat } = loaded;
+    const metadata = await extractMetadata(format, blob);
+    if (myGen !== loadGen) return;
+
+    const durationSeconds = metadata?.duration ?? null;
+    const durationExact = metadata?.durationExact ?? false;
+
     const url = URL.createObjectURL(blob);
     const player = createPlayer(
         url,
@@ -59,14 +65,10 @@ app.ontoolresult = async (result) => {
         positionEl,
         durationEl,
         spectrogramWrapEl,
+        durationSeconds,
+        durationExact,
     );
-    const metadata = await extractMetadata(format, blob);
-    if (myGen !== loadGen) {
-        player.destroy();
-        URL.revokeObjectURL(url);
-        return;
-    }
-    const display = createMetadataDisplay(metadataEl, player.audio, player.worker);
+    const display = createMetadataDisplay(metadataEl, player.worker);
     display.update(metadata, filePath);
     currentAudio = { path: filePath, blob, url, player, display };
 };

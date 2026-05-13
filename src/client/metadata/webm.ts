@@ -11,6 +11,9 @@ const ID_CODEC_ID = 0x86;
 const ID_AUDIO = 0xe1;
 const ID_SAMPLING_FREQUENCY = 0xb5;
 const ID_CHANNELS = 0x9f;
+const ID_INFO = 0x1549a966;
+const ID_DURATION = 0x4489;
+const ID_TIMECODE_SCALE = 0x2ad7b1;
 
 type VInt = { value: number; size: number };
 
@@ -195,9 +198,11 @@ export function parseWebm(bytes: Uint8Array): ParseResult {
         p += sz.size;
         const ep = p + sz.value;
         if (id.value === ID_SEGMENT) {
-            const tracks = findChild(bytes, p, Math.min(ep, bytes.byteLength), ID_TRACKS);
+            const segEnd = Math.min(ep, bytes.byteLength);
+            const tracks = findChild(bytes, p, segEnd, ID_TRACKS);
             if (!tracks) return null;
             // Iterate TrackEntry children. Return the first audio entry found.
+            let entry: NonNullable<ParseResult> | null = null;
             let q = tracks.start;
             while (q < tracks.end) {
                 const eid = readElementId(bytes, q, tracks.end);
@@ -208,12 +213,43 @@ export function parseWebm(bytes: Uint8Array): ParseResult {
                 q += esz.size;
                 const eend = q + esz.value;
                 if (eid.value === ID_TRACK_ENTRY) {
-                    const entry = parseTrackEntry(bytes, dv, q, eend);
-                    if (entry) return entry;
+                    const parsed = parseTrackEntry(bytes, dv, q, eend);
+                    if (parsed) {
+                        entry = parsed;
+                        break;
+                    }
                 }
                 q = eend;
             }
-            return null;
+            if (!entry) return null;
+
+            const info = findChild(bytes, p, segEnd, ID_INFO);
+            if (info) {
+                let durationVal: number | undefined;
+                let timecodeScale = 1_000_000; // default per spec
+                let r = info.start;
+                while (r < info.end) {
+                    const eid = readElementId(bytes, r, info.end);
+                    if (!eid) break;
+                    r += eid.size;
+                    const esz = readVInt(bytes, r, info.end);
+                    if (!esz) break;
+                    r += esz.size;
+                    const eend = r + esz.value;
+                    if (eid.value === ID_DURATION) {
+                        const f = readFloatBE(dv, r, esz.value);
+                        if (f !== undefined) durationVal = f;
+                    } else if (eid.value === ID_TIMECODE_SCALE) {
+                        timecodeScale = readUintBE(bytes, r, esz.value);
+                    }
+                    r = eend;
+                }
+                if (durationVal !== undefined && timecodeScale > 0) {
+                    entry.duration = (durationVal * timecodeScale) / 1e9;
+                    entry.durationExact = true;
+                }
+            }
+            return entry;
         }
         p = ep;
     }

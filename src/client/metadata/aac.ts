@@ -54,11 +54,31 @@ export function parseAac(bytes: Uint8Array): ParseResult {
     if (chanCfg === 0) return null; // 0 = AOT-specified — we don't decode AudioSpecificConfig here.
     const channels = chanCfg === 7 ? 8 : chanCfg;
 
-    return {
+    // Walk ADTS frames: each header is 7 bytes (no CRC) or 9 bytes (with CRC,
+    // bit 0 of b1 == 0). frame_length spans bits 30..43 of the header.
+    let p = start;
+    let frames = 0;
+    while (p + 7 <= bytes.byteLength) {
+        if (bytes[p] !== 0xff || (bytes[p + 1] & 0xf0) !== 0xf0) break;
+        const frameLen =
+            ((bytes[p + 3] & 0x03) << 11) |
+            (bytes[p + 4] << 3) |
+            (bytes[p + 5] >> 5);
+        if (frameLen < 7) break;
+        frames++;
+        p += frameLen;
+    }
+
+    const result: NonNullable<ParseResult> = {
         channels,
         channelLayout: channelLayoutFor(channels),
         sampleRate: SAMPLE_RATES[srIdx],
         codec: PROFILE_NAMES[profile] ?? `AAC-Profile${profile}`,
         sampleFormat: "compressed",
     };
+    if (frames > 0) {
+        result.duration = (frames * 1024) / SAMPLE_RATES[srIdx];
+        result.durationExact = true;
+    }
+    return result;
 }

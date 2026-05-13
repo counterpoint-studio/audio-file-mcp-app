@@ -19,14 +19,21 @@ export function parseQoa(bytes: Uint8Array): ParseResult {
     // First frame header: u8 channels | u24 sampleRate | u16 fsamples | u16 framesize  (BE)
     if (bytes.byteLength < 16) return null;
     if (!isAscii(bytes, 0, "qoaf")) return null;
+    const totalSamples =
+        bytes[4] * 0x1000000 + (bytes[5] << 16) + (bytes[6] << 8) + bytes[7];
     const channels = bytes[8];
     const sampleRate = (bytes[9] << 16) | (bytes[10] << 8) | bytes[11];
     if (channels === 0 || sampleRate === 0) return null;
-    return {
+    const result: NonNullable<ParseResult> = {
         channels,
         channelLayout: channelLayoutFor(channels),
         sampleRate,
         codec: "QOA",
         sampleFormat: "compressed",
     };
+    if (totalSamples > 0 && sampleRate > 0) {
+        result.duration = totalSamples / sampleRate;
+        result.durationExact = true;
+    }
+    return result;
 }

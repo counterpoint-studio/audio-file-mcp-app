@@ -10,9 +10,11 @@ describe("parseM4a", () => {
             sampleRate: 48000,
             codec: "AAC-LC",
             sampleFormat: "compressed",
+            durationExact: true,
         });
         expect(m?.bitrate).toBeGreaterThan(0);
         expect(m?.bitrateExact).toBe(true);
+        expect(m?.duration).toBeCloseTo(0.5, 2);
     });
 
     it("parses M4A with trailing moov (default ffmpeg layout)", () => {
@@ -22,6 +24,8 @@ describe("parseM4a", () => {
             sampleRate: 48000,
             codec: "AAC-LC",
         });
+        expect(m?.duration).toBeCloseTo(0.5, 2);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("walks 64-bit atom size (size=1 + u64 extended)", () => {

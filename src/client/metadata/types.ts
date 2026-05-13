@@ -27,6 +27,8 @@ export type AudioMetadata = {
     midiFormatType?: 0 | 1 | 2;
     midiTrackCount?: number;
     midiDivision?: number;
+    duration?: number;
+    durationExact?: boolean;
 };
 
 export type ParseResult = Omit<AudioMetadata, "container" | "sizeBytes"> | null;

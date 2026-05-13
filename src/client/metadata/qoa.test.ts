@@ -11,7 +11,9 @@ describe("parseQoa", () => {
             sampleRate: 44100,
             codec: "QOA",
             sampleFormat: "compressed",
+            durationExact: true,
         });
+        expect(m?.duration).toBeCloseTo(64 / 44100, 6);
     });
 
     it("returns null for bad magic", () => {

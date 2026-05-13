@@ -73,6 +73,7 @@ export function parseAiff(bytes: Uint8Array): ParseResult {
             if (offset + 8 + 18 > bytes.byteLength) return null;
             const p = offset + 8;
             const channels = dv.getInt16(p, false);
+            const numSampleFrames = dv.getUint32(p + 2, false);
             const sampleSize = dv.getInt16(p + 6, false);
             const sampleRate = Math.round(parseExtendedFloat80(bytes, p + 8));
 
@@ -81,6 +82,10 @@ export function parseAiff(bytes: Uint8Array): ParseResult {
                 channelLayout: channelLayoutFor(channels),
                 sampleRate,
             };
+            if (numSampleFrames > 0 && sampleRate > 0) {
+                result.duration = numSampleFrames / sampleRate;
+                result.durationExact = true;
+            }
 
             if (isAifc && chunkSize >= 22) {
                 const compType = readFourCC(bytes, p + 18);

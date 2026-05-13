@@ -11,6 +11,8 @@ describe("parseCaf", () => {
             bitDepth: 24,
             sampleFormat: "pcm-int",
         });
+        expect(m?.duration).toBeCloseTo(0.1, 3);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("parses CAF/lpcm float 32-bit little-endian", () => {
@@ -18,6 +20,8 @@ describe("parseCaf", () => {
         expect(m?.sampleFormat).toBe("pcm-float");
         expect(m?.bitDepth).toBe(32);
         expect(m?.sampleRate).toBe(48000);
+        expect(m?.duration).toBeCloseTo(0.1, 3);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("parses CAF wrapping Apple Lossless", () => {
@@ -25,6 +29,8 @@ describe("parseCaf", () => {
         expect(m?.codec).toBe("Apple Lossless");
         expect(m?.sampleFormat).toBe("compressed");
         expect(m?.channels).toBe(2);
+        expect(m?.duration).toBeCloseTo(0.3, 1);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("parses synthetic CAF/aac desc chunk (AAC codepath, since ffmpeg can't mux CAF/AAC)", () => {

@@ -41,7 +41,6 @@ function formatSize(bytes: number): string {
 
 export function createMetadataDisplay(
     rootEl: HTMLElement,
-    audio: HTMLAudioElement,
     worker: Worker,
 ): MetadataDisplay {
     const slots = readSlots(rootEl);
@@ -73,9 +72,7 @@ export function createMetadataDisplay(
         const effChannels = current.channels ?? decoderChannels;
         slots.channels.textContent = effChannels !== undefined ? `${effChannels}ch` : "";
 
-        const duration =
-            audio.duration && Number.isFinite(audio.duration) ? audio.duration : undefined;
-        slots.format.textContent = formatSpec(current, decoderSampleRate, duration);
+        slots.format.textContent = formatSpec(current, decoderSampleRate, current.duration);
     }
 
     const onWorkerMessage = (e: MessageEvent): void => {
@@ -87,11 +84,6 @@ export function createMetadataDisplay(
         render();
     };
     worker.addEventListener("message", onWorkerMessage);
-
-    const onLoadedMetadata = (): void => {
-        render();
-    };
-    audio.addEventListener("loadedmetadata", onLoadedMetadata);
 
     render();
 
@@ -105,7 +97,6 @@ export function createMetadataDisplay(
         },
         destroy() {
             worker.removeEventListener("message", onWorkerMessage);
-            audio.removeEventListener("loadedmetadata", onLoadedMetadata);
             current = null;
             currentPath = "";
             decoderChannels = undefined;

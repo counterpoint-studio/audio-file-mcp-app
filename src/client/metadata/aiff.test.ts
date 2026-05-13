@@ -11,7 +11,9 @@ describe("parseAiff", () => {
             sampleRate: 44100,
             bitDepth: 16,
             sampleFormat: "pcm-int",
+            durationExact: true,
         });
+        expect(m?.duration).toBeCloseTo(0.1, 3);
     });
 
     it("parses AIFC with 'sowt' (little-endian PCM)", () => {

@@ -12,6 +12,8 @@ describe("parseAac", () => {
             sampleFormat: "compressed",
         });
         expect(m?.bitrate).toBeUndefined();
+        expect(m?.duration).toBeCloseTo(0.533, 2);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("returns null for non-ADTS bytes", () => {

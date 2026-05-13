@@ -11,6 +11,8 @@ describe("parseWebm", () => {
             codec: "Opus",
             sampleFormat: "compressed",
         });
+        expect(m?.duration).toBeCloseTo(0.508, 2);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("parses WebM/Vorbis", () => {
@@ -20,6 +22,8 @@ describe("parseWebm", () => {
             sampleRate: 44100,
             codec: "Vorbis",
         });
+        expect(m?.duration).toBeCloseTo(0.524, 2);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("returns null for non-WebM bytes", () => {

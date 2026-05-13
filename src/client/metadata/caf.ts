@@ -63,6 +63,12 @@ export function parseCaf(bytes: Uint8Array): ParseResult {
     if (bytes.byteLength < 8) return null;
     if (!isAscii(bytes, 0, "caff")) return null;
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let result: NonNullable<ParseResult> | null = null;
+    let sampleRate = 0;
+    let bytesPerPacket = 0;
+    let framesPerPacket = 0;
+    let dataChunkSize = 0;
+    let paktValidFrames = 0;
     let offset = 8;
     while (offset + 12 <= bytes.byteLength) {
         const chunkType = readFourCC(bytes, offset);
@@ -70,13 +76,15 @@ export function parseCaf(bytes: Uint8Array): ParseResult {
         const payload = offset + 12;
         if (chunkType === "desc") {
             if (payload + 32 > bytes.byteLength) return null;
-            const sampleRate = dv.getFloat64(payload, false);
+            sampleRate = dv.getFloat64(payload, false);
             const formatId = readFourCC(bytes, payload + 8);
             const formatFlags = dv.getUint32(payload + 12, false);
+            bytesPerPacket = dv.getUint32(payload + 16, false);
+            framesPerPacket = dv.getUint32(payload + 20, false);
             const channels = dv.getUint32(payload + 24, false);
             const bitsPerChannel = dv.getUint32(payload + 28, false);
             const mapped = codecFor(formatId, formatFlags);
-            const result: NonNullable<ParseResult> = {
+            result = {
                 channels,
                 channelLayout: channelLayoutFor(channels),
                 sampleRate: Math.round(sampleRate),
@@ -90,10 +98,33 @@ export function parseCaf(bytes: Uint8Array): ParseResult {
                 result.bitDepth = bitsPerChannel;
             }
             if (mapped.codec) result.codec = mapped.codec;
-            return result;
+        } else if (chunkType === "pakt") {
+            if (payload + 24 <= bytes.byteLength) {
+                paktValidFrames = readUint64BE(dv, payload + 8);
+            }
+        } else if (chunkType === "data") {
+            dataChunkSize = chunkSize;
         }
         offset = payload + chunkSize;
         if (!Number.isFinite(offset)) return null;
     }
-    return null;
+    if (result && sampleRate > 0) {
+        let numFrames = 0;
+        if (paktValidFrames > 0) {
+            numFrames = paktValidFrames;
+        } else if (
+            framesPerPacket > 0 &&
+            bytesPerPacket > 0 &&
+            dataChunkSize > 4
+        ) {
+            // data chunk starts with a u32 edit count, then packets.
+            numFrames =
+                ((dataChunkSize - 4) / bytesPerPacket) * framesPerPacket;
+        }
+        if (numFrames > 0) {
+            result.duration = numFrames / sampleRate;
+            result.durationExact = true;
+        }
+    }
+    return result;
 }

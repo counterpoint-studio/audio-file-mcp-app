@@ -14,6 +14,8 @@ describe("parseWma", () => {
         });
         expect(m?.bitrate).toBeGreaterThan(120_000);
         expect(m?.bitrate).toBeLessThan(140_000);
+        expect(m?.duration).toBeCloseTo(0.5, 1);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("returns null for non-ASF bytes", () => {

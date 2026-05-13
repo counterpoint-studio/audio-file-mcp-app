@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseMp3 } from "./mp3";
+import { extractMetadata } from "./index";
 import { loadFixture } from "./__fixtures__/load";
 
 describe("parseMp3", () => {
@@ -88,5 +89,21 @@ describe("parseMp3", () => {
 
     it("returns null when no MP3 frame is found", () => {
         expect(parseMp3(new Uint8Array(64))).toBeNull();
+    });
+
+    it("estimates duration via extractMetadata from bitrate and size (CBR)", async () => {
+        const bytes = loadFixture("mp3-cbr128-stereo-44100.mp3");
+        const blob = new Blob([bytes]);
+        const m = await extractMetadata("mp3", blob);
+        expect(m?.duration).toBeGreaterThan(0);
+        expect(m?.durationExact).toBe(false);
+    });
+
+    it("estimates duration via extractMetadata from bitrate and size (VBR Xing)", async () => {
+        const bytes = loadFixture("mp3-vbr-xing-stereo-44100.mp3");
+        const blob = new Blob([bytes]);
+        const m = await extractMetadata("mp3", blob);
+        expect(m?.duration).toBeGreaterThan(0);
+        expect(m?.durationExact).toBe(false);
     });
 });

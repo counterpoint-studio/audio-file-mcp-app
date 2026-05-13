@@ -6,8 +6,9 @@ export type Waveform = { destroy(): void; worker: Worker };
 export function createWaveform(
     blob: Blob,
     decodeFormat: AudioDecodeFormat | null,
-    audio: HTMLAudioElement,
     seekBarEl: HTMLElement,
+    durationSeconds: number | null,
+    durationExact: boolean,
 ): Waveform {
     // transferControlToOffscreen can only be called once per HTMLCanvasElement.
     // Replace the existing #waveform with a fresh canvas so subsequent loads
@@ -30,6 +31,8 @@ export function createWaveform(
             dpr: window.devicePixelRatio,
             blob,
             format: decodeFormat,
+            durationSeconds,
+            durationExact,
         },
         [offscreen],
     );
@@ -70,17 +73,6 @@ export function createWaveform(
     };
     watchDpr();
 
-    const postDuration = () => {
-        if (Number.isFinite(audio.duration) && audio.duration > 0) {
-            worker.postMessage({ type: "duration", seconds: audio.duration });
-        }
-    };
-    if (audio.readyState >= 1) {
-        // loadedmetadata already fired before we attached.
-        postDuration();
-    }
-    audio.addEventListener("loadedmetadata", postDuration);
-
     const onWorkerMessage = (e: MessageEvent) => {
         const data = e.data;
         if (!data || typeof data !== "object") return;
@@ -99,7 +91,6 @@ export function createWaveform(
                 pendingResizeRaf = 0;
             }
             dprMql?.removeEventListener("change", onDprChange);
-            audio.removeEventListener("loadedmetadata", postDuration);
             worker.removeEventListener("message", onWorkerMessage);
             worker.terminate();
         },

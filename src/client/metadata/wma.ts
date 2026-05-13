@@ -9,6 +9,10 @@ const STREAM_PROPERTIES_GUID = Uint8Array.from([
     0x91, 0x07, 0xdc, 0xb7, 0xb7, 0xa9, 0xcf, 0x11,
     0x8e, 0xe6, 0x00, 0xc0, 0x0c, 0x20, 0x53, 0x65,
 ]);
+const FILE_PROPERTIES_GUID = Uint8Array.from([
+    0xa1, 0xdc, 0xab, 0x8c, 0x47, 0xa9, 0xcf, 0x11,
+    0x8e, 0xe4, 0x00, 0xc0, 0x0c, 0x20, 0x53, 0x65,
+]);
 const AUDIO_MEDIA_GUID = Uint8Array.from([
     0x40, 0x9e, 0x69, 0xf8, 0x4d, 0x5b, 0xcf, 0x11,
     0xa8, 0xfd, 0x00, 0x80, 0x5f, 0x5c, 0x44, 0x2b,
@@ -51,12 +55,23 @@ export function parseWma(bytes: Uint8Array): ParseResult {
         // size is informational; clamp instead of failing.
     }
     const headerEnd = Math.min(bytes.byteLength, Math.max(30, totalSize));
+    let result: NonNullable<ParseResult> | null = null;
+    let playDuration100ns = 0;
+    let prerollMs = 0;
     // Sub-objects begin at offset 30 (after numHeaderObjs + 2 reserved bytes).
     let p = 30;
     while (p + 24 <= headerEnd) {
         const objSize = readUint64LE(dv, p + 16);
         if (objSize < 24 || p + objSize > headerEnd + 64) break; // guard
-        if (guidEquals(bytes, p, STREAM_PROPERTIES_GUID)) {
+        if (guidEquals(bytes, p, FILE_PROPERTIES_GUID)) {
+            // Payload offset 40: Play Duration (u64 LE, 100 ns units).
+            // Payload offset 56: Preroll (u64 LE, ms) — Play Duration includes this.
+            const sp = p + 24;
+            if (sp + 64 <= headerEnd) {
+                playDuration100ns = readUint64LE(dv, sp + 40);
+                prerollMs = readUint64LE(dv, sp + 56);
+            }
+        } else if (guidEquals(bytes, p, STREAM_PROPERTIES_GUID)) {
             // Stream Properties Object payload starts at p+24.
             const sp = p + 24;
             // StreamType GUID (16) + ErrorCorrectionType GUID (16) + TimeOffset(8)
@@ -79,7 +94,7 @@ export function parseWma(bytes: Uint8Array): ParseResult {
             const channels = dv.getUint16(tsd + 2, true);
             const sampleRate = dv.getUint32(tsd + 4, true);
             const avgBytesPerSec = dv.getUint32(tsd + 8, true);
-            return {
+            result = {
                 channels,
                 channelLayout: channelLayoutFor(channels),
                 sampleRate,
@@ -93,5 +108,12 @@ export function parseWma(bytes: Uint8Array): ParseResult {
         }
         p += objSize;
     }
-    return null;
+    if (result && playDuration100ns > 0) {
+        const seconds = (playDuration100ns - prerollMs * 10000) / 1e7;
+        if (seconds > 0) {
+            result.duration = seconds;
+            result.durationExact = true;
+        }
+    }
+    return result;
 }

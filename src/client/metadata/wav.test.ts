@@ -11,7 +11,15 @@ describe("parseWav", () => {
             sampleRate: 44100,
             bitDepth: 16,
             sampleFormat: "pcm-int",
+            durationExact: true,
         });
+        expect(m?.duration).toBeCloseTo(0.1, 3);
+    });
+
+    it("computes duration from the data chunk size and avgBytesPerSec", () => {
+        const m = parseWav(loadFixture("wav-pcm24-mono-48000.wav"));
+        expect(m?.duration).toBeCloseTo(0.1, 3);
+        expect(m?.durationExact).toBe(true);
     });
 
     it("parses 24-bit mono 48k PCM", () => {
