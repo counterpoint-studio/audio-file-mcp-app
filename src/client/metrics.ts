@@ -2,7 +2,6 @@ import {
     PLACEHOLDER,
     formatDb,
     formatDbFromLinear,
-    formatLufs,
 } from "./metrics-format";
 import { formatTime } from "./time-display";
 
@@ -150,7 +149,7 @@ function renderGlobal(c: GlobalCells, m: LiveMetrics): void {
     c.samplePeak.textContent = formatDbFromLinear(m.samplePeak);
     c.truePeak.textContent = formatDb(m.truePeak);
     c.rms.textContent = formatDbFromLinear(m.rms);
-    c.integrated.textContent = formatLufs(m.integrated);
+    c.integrated.textContent = formatLufsValue(m.integrated);
 }
 
 function renderSample(c: SampleCells, v: SampleValues): void {
@@ -161,6 +160,12 @@ function renderSample(c: SampleCells, v: SampleValues): void {
     }
     c.peak.textContent = compactDbFromLinear(v.samplePeak);
     c.rms.textContent = compactDbFromLinear(v.rms);
+}
+
+function formatLufsValue(v: number): string {
+    if (Number.isNaN(v)) return PLACEHOLDER;
+    if (!Number.isFinite(v)) return "-∞";
+    return v.toFixed(1);
 }
 
 function compactDbFromLinear(linear: number): string {
