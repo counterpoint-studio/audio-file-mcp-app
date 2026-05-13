@@ -16,6 +16,10 @@ import {
     createAudioContextPublisher,
     type AudioContextPublisher,
 } from "./audio-context-publisher";
+import {
+    parseDisplayAudioInit,
+    type DisplayAudioInit,
+} from "./display-audio-init";
 
 const metadataEl = document.querySelector("#info") as HTMLElement;
 const playPauseBtn = document.querySelector("#play-pause") as HTMLButtonElement;
@@ -82,8 +86,9 @@ let currentAudio: AudioState | null = null;
 let loadGen = 0;
 
 app.ontoolresult = async (result) => {
-    const filePath = result.content?.find(c => c.type === "text")?.text;
-    if (!filePath) return;
+    const init = parseDisplayAudioInit(result);
+    if (!init) return;
+    const filePath = init.path;
 
     const myGen = ++loadGen;
     releaseCurrent();
@@ -155,12 +160,49 @@ app.ontoolresult = async (result) => {
         const display = createMetadataDisplay(metadataEl, player.worker);
         display.update(metadata, filePath);
         currentAudio = { path: filePath, blob, url, player, display, publisher };
+        applyInitialState(currentAudio, init, () => myGen === loadGen);
     } finally {
         if (myGen === loadGen) {
             playPauseBtn.classList.remove("is-loading");
         }
     }
 };
+
+function applyInitialState(
+    state: AudioState,
+    init: DisplayAudioInit,
+    stillCurrent: () => boolean,
+): void {
+    if (init.playheadSeconds === undefined && !init.region) return;
+
+    const apply = () => {
+        if (!stillCurrent()) return;
+        const { audio } = state.player;
+        const duration = audio.duration;
+        if (!Number.isFinite(duration) || duration <= 0) return;
+
+        if (init.region) {
+            state.player.loopRegion.setRegion(
+                init.region.startSeconds,
+                init.region.endSeconds,
+            );
+        }
+
+        const target =
+            init.playheadSeconds ?? init.region?.startSeconds ?? 0;
+        const clamped = Math.max(0, Math.min(duration, target));
+        audio.currentTime = clamped;
+        state.publisher.setPosition(clamped, null);
+    };
+
+    if (state.player.audio.readyState >= 1) {
+        apply();
+    } else {
+        state.player.audio.addEventListener("loadedmetadata", apply, {
+            once: true,
+        });
+    }
+}
 
 function releaseCurrent(): void {
     if (currentAudio) {

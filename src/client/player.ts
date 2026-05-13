@@ -10,6 +10,7 @@ export type Player = {
     destroy(): void;
     audio: HTMLAudioElement;
     worker: Worker;
+    loopRegion: LoopRegion;
 };
 
 export type PlayerPositionSamples = {
@@ -179,6 +180,7 @@ export function createPlayer(
     return {
         audio,
         worker: waveform.worker,
+        loopRegion,
         destroy() {
             // Tear down render layers (which may still hold the blob) before
             // the audio detaches and the URL is revoked.

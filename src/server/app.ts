@@ -19,6 +19,11 @@ const server = new McpServer({
 
 const resourceUri = "ui://ctpt.co/audio-file/mcp-app.html";
 
+const regionSchema = z.object({
+  startSeconds: z.number().min(0).finite(),
+  endSeconds: z.number().min(0).finite(),
+});
+
 registerAppTool(
   server,
   "display-audio-file",
@@ -26,17 +31,40 @@ registerAppTool(
     title: "Display audio file",
     description: "Display a UI for an audio file, providing the user with playback, metadata, and statistics. Use when the user specifically asks to hear or see an audio file, or when otherwise clear from context that one would be helpful.",
     inputSchema: z.object({
-       path: z.string().describe("Absolute path to an audio file on the user's machine")
+      path: z
+        .string()
+        .describe("Absolute path to an audio file on the user's machine"),
+      playheadSeconds: z
+        .number()
+        .min(0)
+        .finite()
+        .optional()
+        .describe(
+          "Optional initial playhead position in seconds (decimal)",
+        ),
+      region: regionSchema
+        .optional()
+        .describe(
+          "Optional initial selected/highlighted region in seconds (decimal)",
+        ),
     }),
     _meta: { ui: { resourceUri } },
   },
-  async ({ path }) => {
+  async ({ path, playheadSeconds, region }) => {
     const normalized = normalizeIncomingPath(path);
     if (!normalized) {
       throw new Error("Path parameter is required");
     }
+    const structuredContent: Record<string, unknown> = { path: normalized };
+    if (playheadSeconds !== undefined) {
+      structuredContent.playheadSeconds = playheadSeconds;
+    }
+    if (region !== undefined && region.endSeconds > region.startSeconds) {
+      structuredContent.region = region;
+    }
     return {
       content: [{ type: "text", text: normalized }],
+      structuredContent,
     };
   },
 );

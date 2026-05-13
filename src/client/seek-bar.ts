@@ -57,6 +57,14 @@ export function createSeekBar(
     const onPlay = () => startRaf();
     const onPause = () => stopRaf();
 
+    const onSeeked = () => {
+        if (gestureState !== "idle") return;
+        const { currentTime, duration } = audio;
+        if (Number.isFinite(duration) && duration > 0) {
+            setProgress(currentTime / duration);
+        }
+    };
+
     const pointerToProgress = (e: PointerEvent): number => {
         const rect = seekBarEl.getBoundingClientRect();
         if (rect.width <= 0) return 0;
@@ -121,6 +129,7 @@ export function createSeekBar(
 
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
+    audio.addEventListener("seeked", onSeeked);
     seekBarEl.addEventListener("pointerdown", onPointerDown);
     seekBarEl.addEventListener("pointermove", onPointerMove);
     seekBarEl.addEventListener("pointerup", onPointerUpOrCancel);
@@ -135,6 +144,7 @@ export function createSeekBar(
             wasPlayingBeforeScrub = false;
             audio.removeEventListener("play", onPlay);
             audio.removeEventListener("pause", onPause);
+            audio.removeEventListener("seeked", onSeeked);
             seekBarEl.removeEventListener("pointerdown", onPointerDown);
             seekBarEl.removeEventListener("pointermove", onPointerMove);
             seekBarEl.removeEventListener("pointerup", onPointerUpOrCancel);
