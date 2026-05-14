@@ -11,8 +11,9 @@ type WasmModule = {
         numBins: number,
         floorDb: number,
         ceilDb: number,
-        magRef: number,
-        floorMag: number,
+        ref: number,
+        floorValue: number,
+        dbMult: number,
         lut: number,
         out: number,
     ): void;
@@ -25,8 +26,9 @@ export interface GridRenderer {
         numBins: number;
         floorDb: number;
         ceilDb: number;
-        magRef: number;
-        floorMag: number;
+        ref: number;
+        floorValue: number;
+        dbMult: number;
         out: Uint8ClampedArray;
     }): void;
     dispose(): void;
@@ -74,11 +76,12 @@ class WasmGridRenderer implements GridRenderer {
         numBins: number;
         floorDb: number;
         ceilDb: number;
-        magRef: number;
-        floorMag: number;
+        ref: number;
+        floorValue: number;
+        dbMult: number;
         out: Uint8ClampedArray;
     }): void {
-        const { grid, decodedCols, numBins, floorDb, ceilDb, magRef, floorMag, out } = params;
+        const { grid, decodedCols, numBins, floorDb, ceilDb, ref, floorValue, dbMult, out } = params;
         if (decodedCols <= 0 || numBins <= 0) return;
         const gridFloats = decodedCols * numBins;
         const outBytes = gridFloats * 4;
@@ -96,8 +99,9 @@ class WasmGridRenderer implements GridRenderer {
             numBins,
             floorDb,
             ceilDb,
-            magRef,
-            floorMag,
+            ref,
+            floorValue,
+            dbMult,
             this.lutPtr,
             this.outPtr,
         );

@@ -64,7 +64,7 @@ describe("render_grid_to_rgba (WASM)", () => {
             renderer.render({
                 grid, decodedCols: cols, numBins,
                 floorDb: FLOOR_DB, ceilDb: CEIL_DB,
-                magRef: MAG_REF, floorMag: FLOOR_MAG,
+                ref: MAG_REF, floorValue: FLOOR_MAG, dbMult: 20,
                 out,
             });
         } finally {
@@ -89,7 +89,7 @@ describe("render_grid_to_rgba (WASM)", () => {
             renderer.render({
                 grid, decodedCols: cols, numBins,
                 floorDb: FLOOR_DB, ceilDb: CEIL_DB,
-                magRef: MAG_REF, floorMag: FLOOR_MAG,
+                ref: MAG_REF, floorValue: FLOOR_MAG, dbMult: 20,
                 out,
             });
         } finally {
@@ -115,7 +115,7 @@ describe("render_grid_to_rgba (WASM)", () => {
             renderer.render({
                 grid, decodedCols: cols, numBins,
                 floorDb: FLOOR_DB, ceilDb: CEIL_DB,
-                magRef: MAG_REF, floorMag: FLOOR_MAG,
+                ref: MAG_REF, floorValue: FLOOR_MAG, dbMult: 20,
                 out,
             });
         } finally {
@@ -145,7 +145,7 @@ describe("render_grid_to_rgba (WASM)", () => {
             renderer.render({
                 grid, decodedCols: cols, numBins,
                 floorDb: FLOOR_DB, ceilDb: CEIL_DB,
-                magRef: MAG_REF, floorMag: FLOOR_MAG,
+                ref: MAG_REF, floorValue: FLOOR_MAG, dbMult: 20,
                 out,
             });
         } finally {
@@ -183,7 +183,7 @@ describe("render_grid_to_rgba (WASM)", () => {
             renderer.render({
                 grid, decodedCols: cols, numBins,
                 floorDb: FLOOR_DB, ceilDb: CEIL_DB,
-                magRef: MAG_REF, floorMag: FLOOR_MAG,
+                ref: MAG_REF, floorValue: FLOOR_MAG, dbMult: 20,
                 out,
             });
         } finally {
@@ -209,7 +209,7 @@ describe("render_grid_to_rgba (WASM)", () => {
             renderer.render({
                 grid, decodedCols: cols, numBins,
                 floorDb: FLOOR_DB, ceilDb: CEIL_DB,
-                magRef: MAG_REF, floorMag: FLOOR_MAG,
+                ref: MAG_REF, floorValue: FLOOR_MAG, dbMult: 20,
                 out,
             });
         } finally {

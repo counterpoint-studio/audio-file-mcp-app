@@ -12,22 +12,11 @@ beforeAll(async () => {
 
 const SAMPLE_RATE = 44100;
 
-function hann(N: number): Float32Array {
-    const w = new Float32Array(N);
-    for (let n = 0; n < N; n++) {
-        w[n] = 0.5 * (1 - Math.cos((2 * Math.PI * n) / (N - 1)));
-    }
-    return w;
-}
-
-function hannWindowedSine(freq: number, amplitude = 1): Float32Array {
-    const w = hann(FFT_SIZE);
+function makeSine(freq: number, amplitude = 1): Float32Array {
+    // Raw (unwindowed) sine. WaveformBandEnergyAnalyzer applies its own Hann.
     const out = new Float32Array(FFT_SIZE);
     for (let i = 0; i < FFT_SIZE; i++) {
-        out[i] =
-            amplitude *
-            Math.sin((2 * Math.PI * freq * i) / SAMPLE_RATE) *
-            w[i];
+        out[i] = amplitude * Math.sin((2 * Math.PI * freq * i) / SAMPLE_RATE);
     }
     return out;
 }
@@ -44,7 +33,7 @@ describe("WaveformBandEnergyAnalyzer", () => {
     it("attributes a 100 Hz sine to the low band", () => {
         const a = new WaveformBandEnergyAnalyzer();
         a.init(SAMPLE_RATE);
-        a.onFrame(hannWindowedSine(100), 0, SAMPLE_RATE);
+        a.onFrame(makeSine(100), 0, SAMPLE_RATE);
         const e = a.queryRange(0, HOP / SAMPLE_RATE);
         expect(e.low).toBeGreaterThan(e.mid);
         expect(e.low).toBeGreaterThan(e.high);
@@ -54,7 +43,7 @@ describe("WaveformBandEnergyAnalyzer", () => {
     it("attributes a 1000 Hz sine to the mid band", () => {
         const a = new WaveformBandEnergyAnalyzer();
         a.init(SAMPLE_RATE);
-        a.onFrame(hannWindowedSine(1000), 0, SAMPLE_RATE);
+        a.onFrame(makeSine(1000), 0, SAMPLE_RATE);
         const e = a.queryRange(0, HOP / SAMPLE_RATE);
         expect(e.mid).toBeGreaterThan(e.low);
         expect(e.mid).toBeGreaterThan(e.high);
@@ -64,7 +53,7 @@ describe("WaveformBandEnergyAnalyzer", () => {
     it("attributes an 8000 Hz sine to the high band", () => {
         const a = new WaveformBandEnergyAnalyzer();
         a.init(SAMPLE_RATE);
-        a.onFrame(hannWindowedSine(8000), 0, SAMPLE_RATE);
+        a.onFrame(makeSine(8000), 0, SAMPLE_RATE);
         const e = a.queryRange(0, HOP / SAMPLE_RATE);
         expect(e.high).toBeGreaterThan(e.low);
         expect(e.high).toBeGreaterThan(e.mid);
@@ -74,9 +63,9 @@ describe("WaveformBandEnergyAnalyzer", () => {
     it("frame count increments with each onFrame call", () => {
         const a = new WaveformBandEnergyAnalyzer();
         a.init(SAMPLE_RATE);
-        a.onFrame(hannWindowedSine(1000), 0, SAMPLE_RATE);
-        a.onFrame(hannWindowedSine(1000), 1, SAMPLE_RATE);
-        a.onFrame(hannWindowedSine(1000), 2, SAMPLE_RATE);
+        a.onFrame(makeSine(1000), 0, SAMPLE_RATE);
+        a.onFrame(makeSine(1000), 1, SAMPLE_RATE);
+        a.onFrame(makeSine(1000), 2, SAMPLE_RATE);
         expect(a.frameCount).toBe(3);
     });
 
@@ -84,8 +73,8 @@ describe("WaveformBandEnergyAnalyzer", () => {
         const a = new WaveformBandEnergyAnalyzer();
         a.init(SAMPLE_RATE);
         // Two frames at amplitude 1 and amplitude 2 — energy scales as amplitude².
-        a.onFrame(hannWindowedSine(1000, 1), 0, SAMPLE_RATE);
-        a.onFrame(hannWindowedSine(1000, 2), 1, SAMPLE_RATE);
+        a.onFrame(makeSine(1000, 1), 0, SAMPLE_RATE);
+        a.onFrame(makeSine(1000, 2), 1, SAMPLE_RATE);
 
         const period = HOP / SAMPLE_RATE;
         const e0 = a.queryRange(0, period * 0.5); // covers frame 0 only
@@ -104,7 +93,7 @@ describe("WaveformBandEnergyAnalyzer", () => {
     it("queryRange with no overlap clamps to the nearest frame index", () => {
         const a = new WaveformBandEnergyAnalyzer();
         a.init(SAMPLE_RATE);
-        a.onFrame(hannWindowedSine(1000), 0, SAMPLE_RATE);
+        a.onFrame(makeSine(1000), 0, SAMPLE_RATE);
         // Range entirely before frame 0 still returns frame 0's energy
         // (i1 forced to i0 + 1 when collapsed).
         const e = a.queryRange(-1, -0.5);
@@ -114,7 +103,7 @@ describe("WaveformBandEnergyAnalyzer", () => {
     it("growable buffer survives past initial capacity", () => {
         const a = new WaveformBandEnergyAnalyzer(2);
         a.init(SAMPLE_RATE);
-        const frame = hannWindowedSine(1000);
+        const frame = makeSine(1000);
         for (let i = 0; i < 7; i++) {
             a.onFrame(frame, i, SAMPLE_RATE);
         }
@@ -128,14 +117,14 @@ describe("WaveformBandEnergyAnalyzer", () => {
         a.init(SAMPLE_RATE);
         // A 100 Hz sine should land below the 250 Hz cutoff (low band).
         // A 500 Hz sine should land above the low cutoff (mid band).
-        a.onFrame(hannWindowedSine(100), 0, SAMPLE_RATE);
+        a.onFrame(makeSine(100), 0, SAMPLE_RATE);
         const period = HOP / SAMPLE_RATE;
         const low100 = a.queryRange(0, period).low;
         expect(low100).toBeGreaterThan(0);
 
         const a2 = new WaveformBandEnergyAnalyzer();
         a2.init(SAMPLE_RATE);
-        a2.onFrame(hannWindowedSine(500), 0, SAMPLE_RATE);
+        a2.onFrame(makeSine(500), 0, SAMPLE_RATE);
         const e500 = a2.queryRange(0, period);
         expect(e500.mid).toBeGreaterThan(e500.low);
     });
@@ -144,7 +133,7 @@ describe("WaveformBandEnergyAnalyzer", () => {
         const a = new WaveformBandEnergyAnalyzer();
         a.init(SAMPLE_RATE);
         // Switch to 48 kHz — verify it does not throw and still appends a frame.
-        a.onFrame(hannWindowedSine(1000), 0, 48000);
+        a.onFrame(makeSine(1000), 0, 48000);
         expect(a.frameCount).toBe(1);
     });
 

@@ -1,5 +1,4 @@
-import { createFft, type Fft } from "../dsp/fft";
-import { createGridRenderer, type GridRenderer } from "../dsp/render-grid";
+import { getInstance, instantiate } from "../dsp/wasm-dsp.gen";
 import type { Analyzer, AnalyzerChunk } from "./analyzer";
 import { FFT_SIZE, HOP, type FrameConsumer } from "./frame-router";
 import {
@@ -14,10 +13,13 @@ const REDRAW_INTERVAL_MS = 50;
 const MIN_HZ = 20;
 const FLOOR_DB = -100;
 const CEIL_DB = 0;
-// Hann-windowed PFFFT of size FFT_SIZE maps a full-scale sine to magnitude FFT_SIZE/4.
-// Dividing by this normalises the per-bin magnitude so 0 dB ≈ peak amplitude 1.0.
-const MAG_REF = FFT_SIZE / 4;
-const FLOOR_MAG = MAG_REF * Math.pow(10, FLOOR_DB / 20);
+const DB_MULT = 10; // energy semantics: db = 10*log10(...)
+
+// Per-cell 0 dB reference (linear energy): the |X_h|² that one frame of a
+// full-scale Hann-windowed sine deposits into its dominant log-band cell.
+// Pinned empirically (see spectrogram.test.ts MAG_REF_ENERGY calibration).
+// Must stay in sync with MAG_REF_ENERGY in src/wasm/reassign.c.
+const MAG_REF_ENERGY = 387920;
 
 // Matplotlib "inferno" sampled at 9 stops; lerp in linear RGB between them.
 const INFERNO_STOPS: ReadonlyArray<readonly [number, number, number]> = [
@@ -52,37 +54,40 @@ export function makeColorLut(): Uint8ClampedArray {
 
 const COLOR_LUT = makeColorLut();
 
-function buildLogBinEdges(
-    rawBinCount: number,
-    sampleRate: number,
-): Uint16Array {
-    const nyquist = sampleRate / 2;
-    const minHz = Math.max(MIN_HZ, sampleRate / FFT_SIZE);
-    const maxHz = nyquist;
-    const logMin = Math.log(minHz);
-    const logMax = Math.log(maxHz);
-    const edges = new Uint16Array(NUM_BINS + 1);
-    const hzPerBin = nyquist / (rawBinCount - 1);
-    for (let i = 0; i <= NUM_BINS; i++) {
-        const t = i / NUM_BINS;
-        const hz = Math.exp(logMin + (logMax - logMin) * t);
-        const raw = Math.round(hz / hzPerBin);
-        edges[i] = Math.max(0, Math.min(rawBinCount - 1, raw));
-    }
-    return edges;
-}
+type WasmModule = {
+    HEAPF32: Float32Array;
+    HEAPU8: Uint8Array;
+    _malloc(n: number): number;
+    _free(p: number): void;
+    _reassign_init(
+        fftSize: number, hop: number,
+        sampleRate: number, maxCols: number, numBins: number,
+        minHz: number, framesPerCol: number,
+    ): number;
+    _reassign_set_frames_per_col(framesPerCol: number): void;
+    _reassign_reset(): void;
+    _reassign_process_frame(raw: number, frameIndex: number): number;
+    _reassign_render(
+        decodedCols: number,
+        floorDb: number, ceilDb: number,
+        ref: number, floorValue: number, dbMult: number,
+        lut: number, out: number,
+    ): void;
+    _reassign_get_current_col(): number;
+    _reassign_get_frames_in_col(): number;
+    _reassign_get_max_col_touched(): number;
+};
 
 export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
-    private fft: Fft | null = null;
-    private renderer: GridRenderer | null = null;
-    private grid = new Float32Array(MAX_COLS * NUM_BINS);
-    private currentCol = 0;
+    private mod: WasmModule | null = null;
+    private rawPtr = 0;
+    private outPtr = 0;
+    private lutPtr = 0;
+    private outBytes = MAX_COLS * NUM_BINS * 4;
     private framesPerCol = 1;
-    private framesInCol = 0;
     private durationSeconds: number | null = null;
     private sampleRate = 0;
-    private logBinEdges: Uint16Array | null = null;
-    private colMags = new Float32Array(NUM_BINS);
+    private initialized = false;
 
     private canvas: OffscreenCanvas | null = null;
     private ctx: OffscreenCanvasRenderingContext2D | null = null;
@@ -115,20 +120,22 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
             const totalFrames = Math.ceil((seconds * sr) / HOP);
             this.framesPerCol = Math.max(1, Math.ceil(totalFrames / MAX_COLS));
         }
+        if (this.initialized && this.mod) {
+            this.mod._reassign_set_frames_per_col(this.framesPerCol);
+        }
         this.redraw();
     }
 
     init(sampleRate: number): void {
         this.sampleRate = sampleRate;
-        this.grid.fill(0);
-        this.currentCol = 0;
-        this.framesInCol = 0;
-        this.logBinEdges = buildLogBinEdges(FFT_SIZE / 2, sampleRate);
-        if (!this.fft) this.fft = createFft(FFT_SIZE);
-        if (!this.renderer) this.renderer = createGridRenderer(COLOR_LUT);
         if (this.durationSeconds !== null) {
             const totalFrames = Math.ceil((this.durationSeconds * sampleRate) / HOP);
             this.framesPerCol = Math.max(1, Math.ceil(totalFrames / MAX_COLS));
+        }
+        this.ensureWasm(sampleRate);
+        if (this.mod && this.initialized) {
+            this.mod._reassign_reset();
+            this.mod._reassign_set_frames_per_col(this.framesPerCol);
         }
     }
 
@@ -136,36 +143,19 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
         // Driven by FrameRouter via onFrame.
     }
 
-    onFrame(window: Float32Array, _frameIndex: number, sampleRate: number): void {
-        const fft = this.fft;
-        const edges = this.logBinEdges;
-        if (!fft || !edges) return;
+    onFrame(frame: Float32Array, frameIndex: number, sampleRate: number): void {
+        if (!this.initialized || !this.mod) return;
         if (sampleRate !== this.sampleRate) {
+            // Sample rate changed mid-stream: reinit. Rare in practice (would
+            // require switching files); decode resets the whole worker anyway.
             this.sampleRate = sampleRate;
-            this.logBinEdges = buildLogBinEdges(FFT_SIZE / 2, sampleRate);
+            this.ensureWasm(sampleRate);
+            this.mod._reassign_reset();
+            this.mod._reassign_set_frames_per_col(this.framesPerCol);
         }
-        const mags = fft.magnitudes(window);
-        const colMags = this.colMags;
-        const useEdges = this.logBinEdges!;
-        for (let i = 0; i < NUM_BINS; i++) {
-            const lo = useEdges[i];
-            const hi = Math.max(lo + 1, useEdges[i + 1]);
-            let m = 0;
-            for (let k = lo; k < hi; k++) {
-                const v = mags[k];
-                if (v > m) m = v;
-            }
-            colMags[i] = m;
-        }
-        const off = this.currentCol * NUM_BINS;
-        for (let i = 0; i < NUM_BINS; i++) {
-            if (colMags[i] > this.grid[off + i]) this.grid[off + i] = colMags[i];
-        }
-        this.framesInCol++;
-        if (this.framesInCol >= this.framesPerCol && this.currentCol < MAX_COLS - 1) {
-            this.currentCol++;
-            this.framesInCol = 0;
-        }
+        const mod = this.mod;
+        mod.HEAPF32.set(frame, this.rawPtr >> 2);
+        mod._reassign_process_frame(this.rawPtr, frameIndex);
         this.maybeRedraw();
     }
 
@@ -174,14 +164,44 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
     }
 
     dispose(): void {
-        if (this.fft) {
-            this.fft.dispose();
-            this.fft = null;
+        if (this.mod) {
+            if (this.rawPtr) this.mod._free(this.rawPtr);
+            if (this.outPtr) this.mod._free(this.outPtr);
+            if (this.lutPtr) this.mod._free(this.lutPtr);
         }
-        if (this.renderer) {
-            this.renderer.dispose();
-            this.renderer = null;
+        this.rawPtr = 0;
+        this.outPtr = 0;
+        this.lutPtr = 0;
+        this.initialized = false;
+        this.mod = null;
+    }
+
+    private ensureWasm(sampleRate: number): void {
+        if (!this.mod) {
+            // Caller must have awaited instantiate() before any DSP use; same
+            // contract as createFft / createLoudness.
+            this.mod = getInstance() as WasmModule;
         }
+        const mod = this.mod;
+        if (!this.rawPtr) {
+            this.rawPtr = mod._malloc(FFT_SIZE * 4);
+            if (!this.rawPtr) throw new Error("spectrogram raw _malloc failed");
+        }
+        if (!this.outPtr) {
+            this.outPtr = mod._malloc(this.outBytes);
+            if (!this.outPtr) throw new Error("spectrogram out _malloc failed");
+        }
+        if (!this.lutPtr) {
+            this.lutPtr = mod._malloc(COLOR_LUT.length);
+            if (!this.lutPtr) throw new Error("spectrogram lut _malloc failed");
+            mod.HEAPU8.set(COLOR_LUT, this.lutPtr);
+        }
+        mod._reassign_init(
+            FFT_SIZE, HOP,
+            sampleRate, MAX_COLS, NUM_BINS,
+            MIN_HZ, this.framesPerCol,
+        );
+        this.initialized = true;
     }
 
     private applySize(w: number, h: number, ratio: number): void {
@@ -204,10 +224,17 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
 
     private redraw(): void {
         const ctx = this.ctx;
-        if (!ctx) return;
+        const mod = this.mod;
+        if (!ctx || !mod || !this.initialized) return;
         if (this.cssWidth <= 0 || this.cssHeight <= 0) return;
-        const decodedCols =
-            this.currentCol + (this.framesInCol > 0 ? 1 : 0);
+
+        const nominalCol = mod._reassign_get_current_col();
+        const framesInCol = mod._reassign_get_frames_in_col();
+        const maxTouched = mod._reassign_get_max_col_touched();
+        const decodedCols = Math.max(
+            nominalCol + (framesInCol > 0 ? 1 : 0),
+            maxTouched + 1,
+        );
         if (decodedCols <= 0) {
             ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
             return;
@@ -215,7 +242,6 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
 
         const totalCols = this.totalColsForLayout(decodedCols);
         const cssDecodedW = (decodedCols / totalCols) * this.cssWidth;
-
         const cssH = this.cssHeight;
         const offsetW = Math.max(1, Math.round(cssDecodedW * this.dpr));
         const offsetH = Math.max(1, Math.round(cssH * this.dpr));
@@ -225,8 +251,19 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
         ctx.clearRect(0, 0, this.cssWidth * this.dpr, this.cssHeight * this.dpr);
         ctx.restore();
 
-        const imgData = new ImageData(decodedCols, NUM_BINS);
-        this.renderInto(imgData.data, decodedCols);
+        const ref = this.framesPerCol * MAG_REF_ENERGY;
+        const floorValue = ref * Math.pow(10, FLOOR_DB / DB_MULT);
+        mod._reassign_render(
+            decodedCols,
+            FLOOR_DB, CEIL_DB,
+            ref, floorValue, DB_MULT,
+            this.lutPtr, this.outPtr,
+        );
+
+        const rgbaBytes = decodedCols * NUM_BINS * 4;
+        const buf = new Uint8ClampedArray(rgbaBytes);
+        buf.set(mod.HEAPU8.subarray(this.outPtr, this.outPtr + rgbaBytes));
+        const imgData = new ImageData(buf, decodedCols, NUM_BINS);
 
         const tmp = new OffscreenCanvas(decodedCols, NUM_BINS);
         const tctx = tmp.getContext("2d");
@@ -295,19 +332,8 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
         const totalCols = Math.min(MAX_COLS, Math.ceil(totalFrames / this.framesPerCol));
         return Math.max(decodedCols, totalCols);
     }
+}
 
-    private renderInto(buf: Uint8ClampedArray, decodedCols: number): void {
-        const renderer = this.renderer;
-        if (!renderer) return;
-        renderer.render({
-            grid: this.grid,
-            decodedCols,
-            numBins: NUM_BINS,
-            floorDb: FLOOR_DB,
-            ceilDb: CEIL_DB,
-            magRef: MAG_REF,
-            floorMag: FLOOR_MAG,
-            out: buf,
-        });
-    }
+export async function ensureSpectrogramDspReady(): Promise<void> {
+    await instantiate();
 }

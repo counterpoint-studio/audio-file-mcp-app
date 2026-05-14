@@ -2,14 +2,14 @@ import { describe, it, expect } from "vitest";
 import { FrameRouter, FFT_SIZE, HOP, type FrameConsumer } from "./frame-router";
 import type { AnalyzerChunk } from "./analyzer";
 
-type CapturedFrame = { window: Float32Array; frameIndex: number; sampleRate: number };
+type CapturedFrame = { frame: Float32Array; frameIndex: number; sampleRate: number };
 
 function recordingConsumer(): FrameConsumer & { frames: CapturedFrame[] } {
     const frames: CapturedFrame[] = [];
     return {
         frames,
-        onFrame(window, frameIndex, sampleRate) {
-            frames.push({ window: new Float32Array(window), frameIndex, sampleRate });
+        onFrame(frame, frameIndex, sampleRate) {
+            frames.push({ frame: new Float32Array(frame), frameIndex, sampleRate });
         },
     };
 }
@@ -28,12 +28,6 @@ function stereoChunk(left: number[], right: number[], sampleRate = 44100): Analy
         channelData: [Float32Array.from(left), Float32Array.from(right)],
         startSample: 0,
     };
-}
-
-function hann(N: number): Float32Array {
-    const w = new Float32Array(N);
-    for (let n = 0; n < N; n++) w[n] = 0.5 * (1 - Math.cos((2 * Math.PI * n) / (N - 1)));
-    return w;
 }
 
 describe("FrameRouter", () => {
@@ -63,15 +57,14 @@ describe("FrameRouter", () => {
         expect(c.frames.map(f => f.frameIndex)).toEqual([0, 1, 2, 3]);
     });
 
-    it("applies a Hann window: constant-1 input produces Hann coefficients", () => {
+    it("emits raw (unwindowed) frames: constant-1 input produces all-1 frame", () => {
         const c = recordingConsumer();
         const r = new FrameRouter([c]);
         r.init(44100, 1);
         r.feed(chunk(new Array(FFT_SIZE).fill(1)));
         expect(c.frames).toHaveLength(1);
-        const expected = hann(FFT_SIZE);
         for (let i = 0; i < FFT_SIZE; i++) {
-            expect(c.frames[0].window[i]).toBeCloseTo(expected[i], 5);
+            expect(c.frames[0].frame[i]).toBe(1);
         }
     });
 
@@ -84,10 +77,10 @@ describe("FrameRouter", () => {
             new Array(FFT_SIZE).fill(-1),
         ));
         expect(c.frames).toHaveLength(1);
-        for (const v of c.frames[0].window) expect(v).toBe(0);
+        for (const v of c.frames[0].frame) expect(v).toBe(0);
     });
 
-    it("downmix handles unequal stereo correctly: L=0.6 R=0.4 → mono=0.5 → 0.5·Hann[i]", () => {
+    it("downmix handles unequal stereo correctly: L=0.6 R=0.4 → mono=0.5 (unwindowed)", () => {
         const c = recordingConsumer();
         const r = new FrameRouter([c]);
         r.init(44100, 2);
@@ -95,9 +88,8 @@ describe("FrameRouter", () => {
             new Array(FFT_SIZE).fill(0.6),
             new Array(FFT_SIZE).fill(0.4),
         ));
-        const w = hann(FFT_SIZE);
         for (let i = 0; i < FFT_SIZE; i++) {
-            expect(c.frames[0].window[i]).toBeCloseTo(0.5 * w[i], 5);
+            expect(c.frames[0].frame[i]).toBeCloseTo(0.5, 6);
         }
     });
 
@@ -110,9 +102,8 @@ describe("FrameRouter", () => {
         expect(c.frames).toHaveLength(0);
         r.feed(chunk(new Array(FFT_SIZE - 1500).fill(1)));
         expect(c.frames).toHaveLength(1);
-        const w = hann(FFT_SIZE);
         for (let i = 0; i < FFT_SIZE; i++) {
-            expect(c.frames[0].window[i]).toBeCloseTo(w[i], 5);
+            expect(c.frames[0].frame[i]).toBe(1);
         }
     });
 
@@ -133,10 +124,9 @@ describe("FrameRouter", () => {
         samples[M] = 7;
         r.feed(chunk(samples));
         expect(c.frames).toHaveLength(2);
-        const w = hann(FFT_SIZE);
-        expect(c.frames[0].window[M]).toBeCloseTo(7 * w[M], 4);
-        expect(c.frames[1].window[M - HOP]).toBeCloseTo(7 * w[M - HOP], 4);
-        expect(c.frames[1].window[M]).toBe(0);
+        expect(c.frames[0].frame[M]).toBe(7);
+        expect(c.frames[1].frame[M - HOP]).toBe(7);
+        expect(c.frames[1].frame[M]).toBe(0);
     });
 
     it("delivers every frame to every registered consumer with identical contents", () => {
@@ -150,8 +140,8 @@ describe("FrameRouter", () => {
         expect(c2.frames).toHaveLength(2);
         expect(c3.frames).toHaveLength(2);
         for (let i = 0; i < FFT_SIZE; i++) {
-            expect(c2.frames[0].window[i]).toBeCloseTo(c1.frames[0].window[i], 6);
-            expect(c3.frames[0].window[i]).toBeCloseTo(c1.frames[0].window[i], 6);
+            expect(c2.frames[0].frame[i]).toBe(c1.frames[0].frame[i]);
+            expect(c3.frames[0].frame[i]).toBe(c1.frames[0].frame[i]);
         }
     });
 

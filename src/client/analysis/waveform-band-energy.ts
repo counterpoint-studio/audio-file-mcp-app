@@ -1,4 +1,5 @@
 import { createFft, type Fft } from "../dsp/fft";
+import { makeHann, multiplyInto } from "../dsp/windows";
 import type { Analyzer, AnalyzerChunk } from "./analyzer";
 import { FFT_SIZE, HOP, type FrameConsumer } from "./frame-router";
 
@@ -11,6 +12,8 @@ export type BandEnergy = { low: number; mid: number; high: number };
 
 export class WaveformBandEnergyAnalyzer implements FrameConsumer, Analyzer {
     private fft: Fft | null = null;
+    private hann: Float32Array | null = null;
+    private windowed = new Float32Array(FFT_SIZE);
     private buf: Float32Array;
     private count = 0;
     private sampleRate = 0;
@@ -24,6 +27,7 @@ export class WaveformBandEnergyAnalyzer implements FrameConsumer, Analyzer {
         this.sampleRate = sampleRate;
         this.count = 0;
         if (!this.fft) this.fft = createFft(FFT_SIZE);
+        if (!this.hann) this.hann = makeHann(FFT_SIZE);
         this.binBounds = this.computeBinBounds(sampleRate);
     }
 
@@ -31,15 +35,17 @@ export class WaveformBandEnergyAnalyzer implements FrameConsumer, Analyzer {
         // Driven by FrameRouter via onFrame.
     }
 
-    onFrame(window: Float32Array, _frameIndex: number, sampleRate: number): void {
+    onFrame(frame: Float32Array, _frameIndex: number, sampleRate: number): void {
         if (sampleRate !== this.sampleRate) {
             this.sampleRate = sampleRate;
             this.binBounds = this.computeBinBounds(sampleRate);
         }
         const fft = this.fft;
         const bb = this.binBounds;
-        if (!fft || !bb) return;
-        const mags = fft.magnitudes(window);
+        const hann = this.hann;
+        if (!fft || !bb || !hann) return;
+        multiplyInto(frame, hann, this.windowed);
+        const mags = fft.magnitudes(this.windowed);
         let low = 0,
             mid = 0,
             high = 0;

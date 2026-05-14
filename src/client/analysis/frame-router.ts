@@ -4,37 +4,26 @@ export const FFT_SIZE = 2048;
 export const HOP = 1024;
 
 export interface FrameConsumer {
-    onFrame(window: Float32Array, frameIndex: number, sampleRate: number): void;
-}
-
-function makeHann(N: number): Float32Array {
-    const w = new Float32Array(N);
-    for (let n = 0; n < N; n++) {
-        w[n] = 0.5 * (1 - Math.cos((2 * Math.PI * n) / (N - 1)));
-    }
-    return w;
+    // Frame is the raw (unwindowed) mono ring-buffer. Consumers must read it
+    // synchronously: the buffer is reused across frames and not retained.
+    onFrame(frame: Float32Array, frameIndex: number, sampleRate: number): void;
 }
 
 export class FrameRouter implements Analyzer {
     private readonly consumers: FrameConsumer[];
-    private readonly hann: Float32Array;
     private readonly buffer = new Float32Array(FFT_SIZE);
-    private readonly window = new Float32Array(FFT_SIZE);
     private bufferFill = 0;
     private frameIndex = 0;
     private sampleRate = 0;
-    private firstFrameEmitted = false;
 
     constructor(consumers: FrameConsumer[]) {
         this.consumers = consumers;
-        this.hann = makeHann(FFT_SIZE);
     }
 
     init(sampleRate: number): void {
         this.sampleRate = sampleRate;
         this.bufferFill = 0;
         this.frameIndex = 0;
-        this.firstFrameEmitted = false;
     }
 
     feed(chunk: AnalyzerChunk): void {
@@ -66,11 +55,7 @@ export class FrameRouter implements Analyzer {
 
     private emitFrame(): void {
         const buf = this.buffer;
-        const w = this.window;
-        const h = this.hann;
-        for (let i = 0; i < FFT_SIZE; i++) w[i] = buf[i] * h[i];
         const idx = this.frameIndex++;
-        this.firstFrameEmitted = true;
-        for (const c of this.consumers) c.onFrame(w, idx, this.sampleRate);
+        for (const c of this.consumers) c.onFrame(buf, idx, this.sampleRate);
     }
 }

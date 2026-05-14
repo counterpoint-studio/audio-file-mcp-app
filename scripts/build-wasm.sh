@@ -23,13 +23,18 @@ EXPORTS='[
   "_ebur128_loudness_global","_ebur128_loudness_momentary",
   "_ebur128_loudness_shortterm","_ebur128_loudness_range",
   "_ebur128_true_peak","_ebur128_sample_peak",
-  "_render_grid_to_rgba"
+  "_render_grid_to_rgba",
+  "_reassign_init","_reassign_set_frames_per_col","_reassign_reset",
+  "_reassign_process_frame","_reassign_render",
+  "_reassign_get_current_col","_reassign_get_frames_in_col",
+  "_reassign_get_max_col_touched","_reassign_get_grid_ptr"
 ]'
 
 emcc \
   vendor/pffft/pffft.c \
   vendor/libebur128/ebur128.c \
   src/wasm/render.c \
+  src/wasm/reassign.c \
   -O3 -msimd128 -msse -msse2 \
   -I vendor/pffft \
   -I vendor/libebur128 \
