@@ -22,16 +22,19 @@ EXPORTS='[
   "_ebur128_add_frames_float",
   "_ebur128_loudness_global","_ebur128_loudness_momentary",
   "_ebur128_loudness_shortterm","_ebur128_loudness_range",
-  "_ebur128_true_peak","_ebur128_sample_peak"
+  "_ebur128_true_peak","_ebur128_sample_peak",
+  "_render_grid_to_rgba"
 ]'
 
 emcc \
   vendor/pffft/pffft.c \
   vendor/libebur128/ebur128.c \
+  src/wasm/render.c \
   -O3 -msimd128 -msse -msse2 \
   -I vendor/pffft \
   -I vendor/libebur128 \
   -I vendor/libebur128/queue \
+  -I src/wasm \
   -s WASM=1 \
   -s MODULARIZE=1 \
   -s EXPORT_NAME=createWasmDsp \

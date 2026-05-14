@@ -1,4 +1,5 @@
 import { createFft, type Fft } from "../dsp/fft";
+import { createGridRenderer, type GridRenderer } from "../dsp/render-grid";
 import type { Analyzer, AnalyzerChunk } from "./analyzer";
 import { FFT_SIZE, HOP, type FrameConsumer } from "./frame-router";
 import {
@@ -73,6 +74,7 @@ function buildLogBinEdges(
 
 export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
     private fft: Fft | null = null;
+    private renderer: GridRenderer | null = null;
     private grid = new Float32Array(MAX_COLS * NUM_BINS);
     private currentCol = 0;
     private framesPerCol = 1;
@@ -123,6 +125,7 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
         this.framesInCol = 0;
         this.logBinEdges = buildLogBinEdges(FFT_SIZE / 2, sampleRate);
         if (!this.fft) this.fft = createFft(FFT_SIZE);
+        if (!this.renderer) this.renderer = createGridRenderer(COLOR_LUT);
         if (this.durationSeconds !== null) {
             const totalFrames = Math.ceil((this.durationSeconds * sampleRate) / HOP);
             this.framesPerCol = Math.max(1, Math.ceil(totalFrames / MAX_COLS));
@@ -174,6 +177,10 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
         if (this.fft) {
             this.fft.dispose();
             this.fft = null;
+        }
+        if (this.renderer) {
+            this.renderer.dispose();
+            this.renderer = null;
         }
     }
 
@@ -290,24 +297,17 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
     }
 
     private renderInto(buf: Uint8ClampedArray, decodedCols: number): void {
-        const range = CEIL_DB - FLOOR_DB;
-        const lut = COLOR_LUT;
-        for (let col = 0; col < decodedCols; col++) {
-            const srcOff = col * NUM_BINS;
-            for (let b = 0; b < NUM_BINS; b++) {
-                const mag = this.grid[srcOff + b];
-                let db = mag > FLOOR_MAG ? 20 * Math.log10(mag / MAG_REF) : FLOOR_DB;
-                if (db < FLOOR_DB) db = FLOOR_DB;
-                if (db > CEIL_DB) db = CEIL_DB;
-                const t = (db - FLOOR_DB) / range;
-                const li = Math.min(255, Math.max(0, Math.round(t * 255))) * 4;
-                const y = NUM_BINS - 1 - b;
-                const dstOff = (y * decodedCols + col) * 4;
-                buf[dstOff + 0] = lut[li + 0];
-                buf[dstOff + 1] = lut[li + 1];
-                buf[dstOff + 2] = lut[li + 2];
-                buf[dstOff + 3] = lut[li + 3];
-            }
-        }
+        const renderer = this.renderer;
+        if (!renderer) return;
+        renderer.render({
+            grid: this.grid,
+            decodedCols,
+            numBins: NUM_BINS,
+            floorDb: FLOOR_DB,
+            ceilDb: CEIL_DB,
+            magRef: MAG_REF,
+            floorMag: FLOOR_MAG,
+            out: buf,
+        });
     }
 }
