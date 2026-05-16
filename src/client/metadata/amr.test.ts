@@ -30,10 +30,9 @@ describe("parseAmr", () => {
         expect(parseAmr(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]))).toBeNull();
     });
 
-    it("estimates duration via extractMetadata from mode-derived bitrate", async () => {
+    it("estimates duration via extractMetadata from mode-derived bitrate", () => {
         const bytes = loadFixture("amr-nb-mono-8000.amr");
-        const blob = new Blob([bytes]);
-        const m = await extractMetadata("amr", blob);
+        const m = extractMetadata("amr", bytes, bytes.length);
         expect(m?.duration).toBeGreaterThan(0);
         expect(m?.durationExact).toBe(false);
     });

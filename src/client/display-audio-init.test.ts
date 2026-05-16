@@ -76,6 +76,34 @@ describe("parseDisplayAudioInit", () => {
         expect(init?.region).toBeUndefined();
     });
 
+    it("reads sizeBytes when it's a non-negative integer", () => {
+        const init = parseDisplayAudioInit({
+            structuredContent: { path: "/a.wav", sizeBytes: 12345 },
+        });
+        expect(init?.sizeBytes).toBe(12345);
+    });
+
+    it("drops sizeBytes when negative", () => {
+        const init = parseDisplayAudioInit({
+            structuredContent: { path: "/a.wav", sizeBytes: -1 },
+        });
+        expect(init?.sizeBytes).toBeUndefined();
+    });
+
+    it("drops sizeBytes when non-integer", () => {
+        const init = parseDisplayAudioInit({
+            structuredContent: { path: "/a.wav", sizeBytes: 3.5 },
+        });
+        expect(init?.sizeBytes).toBeUndefined();
+    });
+
+    it("drops sizeBytes when non-finite", () => {
+        const init = parseDisplayAudioInit({
+            structuredContent: { path: "/a.wav", sizeBytes: Number.NaN },
+        });
+        expect(init?.sizeBytes).toBeUndefined();
+    });
+
     it("returns null when no path can be found", () => {
         expect(parseDisplayAudioInit({})).toBeNull();
         expect(parseDisplayAudioInit({ content: [] })).toBeNull();

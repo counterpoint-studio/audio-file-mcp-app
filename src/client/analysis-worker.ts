@@ -14,6 +14,10 @@ import { isMediabunnySupported, type AudioFormat } from "./audio-formats";
 import { shouldApplyFinalDuration } from "./analysis/duration-correction";
 import { instantiate as instantiateDsp } from "./dsp/wasm-dsp.gen";
 import { decodeWithMediabunny } from "./analysis/mediabunny-decode";
+import { createChunkStore, type ChunkStore } from "./chunk-store";
+import { createChunkBus, type ChunkBus } from "./chunk-bus";
+import { createChunkedSource } from "./chunked-source";
+import type { Source } from "mediabunny";
 
 type InitMsg = {
     type: "init";
@@ -21,11 +25,17 @@ type InitMsg = {
     cssWidth: number;
     cssHeight: number;
     dpr: number;
-    blob: Blob;
+    sizeBytes: number;
     format: AudioFormat | null;
     durationSeconds: number | null;
     durationExact: boolean;
     theme: "light" | "dark";
+};
+
+type ChunkMsg = {
+    type: "chunk";
+    start: number;
+    blob: Blob;
 };
 
 type ThemeMsg = { type: "theme"; theme: "light" | "dark" };
@@ -56,6 +66,7 @@ type QueryAtMsg = { type: "queryAt"; id: number; seconds: number };
 
 type InMsg =
     | InitMsg
+    | ChunkMsg
     | ResizeMsg
     | SpectrogramCanvasMsg
     | SpectrogramResizeMsg
@@ -97,11 +108,13 @@ let decodeAbort = false;
 let lastLivePostAt = 0;
 let initialDuration: number | null = null;
 let initialDurationExact = false;
+let chunkStore: ChunkStore | null = null;
+let chunkBus: ChunkBus | null = null;
 
 self.onmessage = (e: MessageEvent<InMsg>) => {
     const msg = e.data;
     switch (msg.type) {
-        case "init":
+        case "init": {
             initialDuration = msg.durationSeconds;
             initialDurationExact = msg.durationExact;
             waveform.setTheme(msg.theme);
@@ -115,7 +128,29 @@ self.onmessage = (e: MessageEvent<InMsg>) => {
                 waveform.setDuration(initialDuration);
                 spectrogram.setDuration(initialDuration);
             }
-            void startDecode(msg.blob, msg.format);
+            chunkStore = createChunkStore(msg.sizeBytes);
+            chunkBus = createChunkBus();
+            const source = createChunkedSource({
+                store: chunkStore,
+                loader: {
+                    request: (start, end) => {
+                        self.postMessage({
+                            type: "request-range",
+                            start,
+                            end,
+                        });
+                    },
+                },
+                onChunk: chunkBus.subscribe,
+            });
+            void startDecode(source, msg.format);
+            break;
+        }
+        case "chunk":
+            if (chunkStore && chunkBus) {
+                chunkStore.add(msg.start, msg.blob);
+                chunkBus.emit();
+            }
             break;
         case "resize":
             waveform.resize(msg.cssWidth, msg.cssHeight, msg.dpr);
@@ -141,7 +176,7 @@ self.onmessage = (e: MessageEvent<InMsg>) => {
 };
 
 async function startDecode(
-    blob: Blob,
+    source: Source,
     format: AudioFormat | null,
 ): Promise<void> {
     if (!isMediabunnySupported(format)) {
@@ -152,7 +187,7 @@ async function startDecode(
         await dspReady;
         if (decodeAbort) return;
 
-        await decodeWithMediabunny(blob, {
+        await decodeWithMediabunny(source, {
             isAborted: () => decodeAbort,
             onChunk: (chunk) => {
                 pipeline.feed(chunk);

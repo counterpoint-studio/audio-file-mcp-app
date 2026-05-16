@@ -1,11 +1,16 @@
 import WaveformWorker from "./analysis-worker.ts?worker&inline";
 import { type AudioFormat } from "./audio-formats";
 import { getTheme, subscribeTheme } from "./theme";
+import type { ChunkStore } from "./chunk-store";
+import type { ChunkBus, ChunkEvent } from "./chunk-bus";
+import type { ChunkLoader } from "./chunk-loader";
 
 export type Waveform = { destroy(): void; worker: Worker };
 
 export function createWaveform(
-    blob: Blob,
+    chunkStore: ChunkStore,
+    chunkBus: ChunkBus,
+    loader: Pick<ChunkLoader, "request">,
     format: AudioFormat | null,
     seekBarEl: HTMLElement,
     durationSeconds: number | null,
@@ -30,7 +35,7 @@ export function createWaveform(
             cssWidth: initSize.width,
             cssHeight: initSize.height,
             dpr: window.devicePixelRatio,
-            blob,
+            sizeBytes: chunkStore.totalSize,
             format,
             durationSeconds,
             durationExact,
@@ -38,6 +43,39 @@ export function createWaveform(
         },
         [offscreen],
     );
+
+    // Forward already-loaded chunks at init time, then each subsequent arrival
+    // via the chunk bus.
+    const total = chunkStore.totalSize;
+    const gaps = chunkStore.gaps(0, total);
+    let cursor = 0;
+    for (const [gs, ge] of gaps) {
+        if (cursor < gs) postRange(cursor, gs);
+        cursor = ge;
+    }
+    if (cursor < total) postRange(cursor, total);
+
+    async function postRange(start: number, end: number): Promise<void> {
+        const bytes = await chunkStore.read(start, end);
+        worker.postMessage({
+            type: "chunk",
+            start,
+            blob: new Blob([bytes as BlobPart]),
+        });
+    }
+
+    const unsubscribeBus = chunkBus.subscribe((ev?: ChunkEvent) => {
+        if (!ev) return;
+        worker.postMessage({ type: "chunk", start: ev.start, blob: ev.blob });
+    });
+
+    const onWorkerMessage = (e: MessageEvent) => {
+        const data = e.data;
+        if (data && data.type === "request-range") {
+            loader.request(data.start as number, data.end as number);
+        }
+    };
+    worker.addEventListener("message", onWorkerMessage);
 
     const unsubscribeTheme = subscribeTheme((t) =>
         worker.postMessage({ type: "theme", theme: t }),
@@ -89,6 +127,8 @@ export function createWaveform(
             }
             dprMql?.removeEventListener("change", onDprChange);
             unsubscribeTheme();
+            unsubscribeBus();
+            worker.removeEventListener("message", onWorkerMessage);
             worker.terminate();
         },
     };

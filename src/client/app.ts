@@ -2,13 +2,11 @@ import "./app.css";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { wireTheme } from "./theme";
 import {
-    sniffAudioFormat,
-    audioFormatToMime,
+    sniffAudioFormatBytes,
     type AudioFormat,
 } from "./audio-formats";
-import { base64ToBlob } from "./base64-blob";
 import { createPlayer, type Player } from "./player";
-import { extractMetadata } from "./metadata";
+import { extractMetadata, METADATA_HEADER_BYTES } from "./metadata";
 import { createMetadataDisplay, type MetadataDisplay } from "./metadata-display";
 import {
     createAudioContextPublisher,
@@ -19,6 +17,14 @@ import {
     parseDisplayAudioInit,
     type DisplayAudioInit,
 } from "./display-audio-init";
+import { createChunkStore, type ChunkStore } from "./chunk-store";
+import { createChunkBus, type ChunkBus } from "./chunk-bus";
+import {
+    createChunkLoader,
+    type ChunkLoader,
+} from "./chunk-loader";
+import { createChunkedSource } from "./chunked-source";
+import type { Source } from "mediabunny";
 
 const metadataEl = document.querySelector("#info") as HTMLElement;
 const playPauseBtn = document.querySelector("#play-pause") as HTMLButtonElement;
@@ -73,13 +79,19 @@ let keyWarned = false;
 
 type AudioState = {
     path: string;
-    blob: Blob;
+    source: Source;
+    store: ChunkStore;
+    loader: ChunkLoader;
+    chunkBus: ChunkBus;
     player: Player;
     display: MetadataDisplay;
     publisher: AudioContextPublisher;
 };
 type LoadedAudio = {
-    blob: Blob;
+    source: Source;
+    store: ChunkStore;
+    loader: ChunkLoader;
+    chunkBus: ChunkBus;
     format: AudioFormat | null;
 };
 
@@ -107,6 +119,12 @@ app.ontoolresult = async (result) => {
         );
     }
 
+    if (init.sizeBytes === undefined) {
+        console.warn("display-audio-file result missing sizeBytes; cannot load");
+        showError("decode-failed", "missing file size from server");
+        return;
+    }
+
     const myGen = ++loadGen;
     releaseCurrent();
     hideError();
@@ -115,7 +133,11 @@ app.ontoolresult = async (result) => {
     try {
         let loaded: LoadedAudio | null;
         try {
-            loaded = await loadAudio(filePath, () => myGen === loadGen);
+            loaded = await loadAudio(
+                filePath,
+                init.sizeBytes,
+                () => myGen === loadGen,
+            );
         } catch (e) {
             if (myGen !== loadGen) return;
             const message = e instanceof Error ? e.message : String(e);
@@ -124,9 +146,19 @@ app.ontoolresult = async (result) => {
         }
         if (myGen !== loadGen || loaded === null) return;
 
-        const { blob, format } = loaded;
-        const metadata = await extractMetadata(format, blob);
-        if (myGen !== loadGen) return;
+        const { source, store, loader, chunkBus, format } = loaded;
+        const headerLen = Math.min(METADATA_HEADER_BYTES, init.sizeBytes);
+        await waitForRange(chunkBus, store, 0, headerLen, () => myGen === loadGen);
+        if (myGen !== loadGen) {
+            loader.cancel();
+            return;
+        }
+        const headerBytes = await store.read(0, headerLen);
+        const metadata = extractMetadata(format, headerBytes, init.sizeBytes);
+        if (myGen !== loadGen) {
+            loader.cancel();
+            return;
+        }
 
         const durationSeconds = metadata?.duration ?? null;
         const durationExact = metadata?.durationExact ?? false;
@@ -141,7 +173,10 @@ app.ontoolresult = async (result) => {
         publisher.setPosition(0, null);
 
         const player = createPlayer(
-            blob,
+            source,
+            store,
+            chunkBus,
+            loader,
             format,
             playPauseBtn,
             seekBarEl,
@@ -176,7 +211,16 @@ app.ontoolresult = async (result) => {
         );
         const display = createMetadataDisplay(metadataEl, player.worker);
         display.update(metadata, filePath);
-        currentAudio = { path: filePath, blob, player, display, publisher };
+        currentAudio = {
+            path: filePath,
+            source,
+            store,
+            loader,
+            chunkBus,
+            player,
+            display,
+            publisher,
+        };
         applyInitialState(currentAudio, init, () => myGen === loadGen);
     } finally {
         if (myGen === loadGen) {
@@ -223,6 +267,7 @@ function applyInitialState(
 
 function releaseCurrent(): void {
     if (currentAudio) {
+        currentAudio.loader.cancel();
         currentAudio.display.destroy();
         currentAudio.player.destroy();
         currentAudio.publisher.destroy();
@@ -232,27 +277,82 @@ function releaseCurrent(): void {
 
 async function loadAudio(
     filePath: string,
+    sizeBytes: number,
     stillCurrent: () => boolean,
 ): Promise<LoadedAudio | null> {
-    const uri = `audiofile://${encodeURIComponent(filePath)}`;
-    let resourceResult: Awaited<ReturnType<typeof app.readServerResource>> | null =
-        await app.readServerResource({ uri });
-    if (!stillCurrent()) return null;
+    const store = createChunkStore(sizeBytes);
+    const chunkBus = createChunkBus();
+    const loader = createChunkLoader(store, {
+        path: filePath,
+        totalSize: sizeBytes,
+        chunkBytes: 1 << 20,
+        concurrency: 4,
+        fetcher: (start, length) =>
+            mcpRangeFetcher(filePath, start, length),
+        onChunk: (start, blob) => {
+            store.add(start, blob);
+            chunkBus.emit({ start, end: start + blob.size, blob });
+        },
+    });
+    const source = createChunkedSource({
+        store,
+        loader,
+        onChunk: chunkBus.subscribe,
+    });
 
-    const content = resourceResult.contents[0];
-    if (!content || !("blob" in content)) {
-        throw new Error("Expected blob content from resource response");
+    await waitForFirstChunk(chunkBus, store, stillCurrent);
+    if (!stillCurrent()) {
+        loader.cancel();
+        return null;
     }
 
-    let base64: string | null = content.blob;
-    resourceResult = null;
+    const head = await store.read(0, Math.min(64, sizeBytes));
+    const format = sniffAudioFormatBytes(head);
 
-    const format = sniffAudioFormat(base64);
-    const mime = audioFormatToMime(format);
-    const strt = performance.now();
-    const blob = await base64ToBlob(base64, mime, stillCurrent);
-    console.log(`Decoded base64 to blob in ${(performance.now() - strt).toFixed(2)} ms`);
-    base64 = null;
-    if (blob === null) return null;
-    return { blob, format };
+    return { source, store, loader, chunkBus, format };
 }
+
+async function mcpRangeFetcher(
+    path: string,
+    start: number,
+    length: number,
+): Promise<Uint8Array> {
+    const uri = `audiofile-range://${encodeURIComponent(path)}/${start}/${length}`;
+    const result = await app.readServerResource({ uri });
+    const content = result.contents[0];
+    if (!content || !("blob" in content) || typeof content.blob !== "string") {
+        throw new Error("expected blob content from range resource");
+    }
+    const bytes = Uint8Array.fromBase64(content.blob);
+    return bytes;
+}
+
+function waitForFirstChunk(
+    bus: ChunkBus,
+    store: ChunkStore,
+    stillCurrent: () => boolean,
+): Promise<void> {
+    return waitForRange(bus, store, 0, Math.min(1, store.totalSize), stillCurrent);
+}
+
+function waitForRange(
+    bus: ChunkBus,
+    store: ChunkStore,
+    start: number,
+    end: number,
+    stillCurrent: () => boolean,
+): Promise<void> {
+    return new Promise<void>((resolve) => {
+        if (end <= start || store.isLoaded(start, end)) {
+            resolve();
+            return;
+        }
+        const off = bus.subscribe(() => {
+            if (!stillCurrent() || store.isLoaded(start, end)) {
+                off();
+                resolve();
+            }
+        });
+    });
+}
+

@@ -200,7 +200,7 @@ function setupPlayer(opts: {
         dispose,
     };
     const sink = makeFakeSink({ chunkSec, totalSec: opts.durationSec });
-    const player = createWebAudioPlayer(new Blob([new Uint8Array([1])]), {
+    const player = createWebAudioPlayer({} as unknown as import("mediabunny").Source, {
         createContext: () => ctx as unknown as AudioContext,
         createInput: () => input,
         createSink: () => sink,

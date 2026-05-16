@@ -34,17 +34,19 @@ const PARSERS: Partial<Record<AudioFormat, Parser>> = {
     wma: parseWma,
 };
 
-export async function extractMetadata(
+export const METADATA_HEADER_BYTES = 1 << 20;
+
+export function extractMetadata(
     format: AudioFormat | null,
-    blob: Blob,
-): Promise<AudioMetadata | null> {
+    headerBytes: Uint8Array,
+    sizeBytes: number,
+): AudioMetadata | null {
     if (!format) return null;
-    const bytes = new Uint8Array(await blob.arrayBuffer());
     const parser = PARSERS[format];
-    const parsed = parser ? parser(bytes) : null;
+    const parsed = parser ? parser(headerBytes) : null;
     const meta: AudioMetadata = {
         container: format,
-        sizeBytes: bytes.byteLength,
+        sizeBytes,
         ...(parsed ?? {}),
     };
     if (meta.duration === undefined && meta.bitrate !== undefined) {

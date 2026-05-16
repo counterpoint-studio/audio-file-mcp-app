@@ -11,6 +11,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import * as z from "zod";
 import { normalizeIncomingPath } from "./path-utils.js";
+import { asScalar, parseNonNegInt } from "./range-params.js";
 
 const server = new McpServer({
   name: "Audio File MCP App",
@@ -57,12 +58,15 @@ registerAppTool(
     if (!normalized) {
       throw new Error("Path parameter is required");
     }
+    const stat = await fs.stat(normalized);
     const seq = ++callSeq;
     const createdAt = Date.now();
     const structuredContent: Record<string, unknown> = {
       path: normalized,
       createdAt,
       seq,
+      sizeBytes: stat.size,
+      mtimeMs: stat.mtimeMs,
     };
     if (playheadSeconds !== undefined) {
       structuredContent.playheadSeconds = playheadSeconds;
@@ -98,39 +102,54 @@ registerAppResource(
   },
 );
 
+const MAX_CHUNK_BYTES = 8 * 1024 * 1024;
+
 server.registerResource(
-    "audiofile",
-    new ResourceTemplate("audiofile://{path}", {list: undefined}),
+    "audiofile-range",
+    new ResourceTemplate("audiofile-range://{path}/{start}/{length}", {
+        list: undefined,
+    }),
     {
-        description: "Audio file served as MCP resource (base64 blob)",
+        description:
+            "Byte range of a local audio file as a base64 blob; path/start/length are URL-encoded.",
         mimeType: "application/octet-stream",
     },
-    async (uri, { path }): Promise<ReadResourceResult> => {
-        const pathStrRaw = Array.isArray(path) ? path[0] : path;
-        if (!pathStrRaw) {
-            throw new Error("Path parameter is required");
+    async (uri, { path, start, length }): Promise<ReadResourceResult> => {
+        const rawPath = asScalar(path);
+        if (!rawPath) throw new Error("Path parameter is required");
+        const pathStr = normalizeIncomingPath(decodeURIComponent(rawPath));
+        if (!pathStr) throw new Error("Path parameter is required");
+        const startNum = parseNonNegInt(asScalar(start));
+        const lengthNum = parseNonNegInt(asScalar(length));
+        if (startNum === null || lengthNum === null) {
+            throw new Error("start and length must be non-negative integers");
         }
-        const pathStr = normalizeIncomingPath(decodeURIComponent(pathStrRaw));
-        if (!pathStr) {
-            throw new Error("Path parameter is required");
+        if (lengthNum === 0 || lengthNum > MAX_CHUNK_BYTES) {
+            throw new Error(`length must be in (0, ${MAX_CHUNK_BYTES}]`);
         }
-        const exists = await fs.stat(pathStr).then(() => true).catch(() => false);
-        if (!exists) {
-            throw new Error(`File not found: ${pathStr}`);
+        const fh = await fs.open(pathStr, "r");
+        try {
+            const buf = Buffer.allocUnsafe(lengthNum);
+            const { bytesRead } = await fh.read(buf, 0, lengthNum, startNum);
+            const slice =
+                bytesRead === lengthNum ? buf : buf.subarray(0, bytesRead);
+            return {
+                contents: [
+                    {
+                        uri: uri.href,
+                        mimeType: "application/octet-stream",
+                        blob: slice.toString("base64"),
+                        _meta: { start: startNum, length: bytesRead },
+                    },
+                ],
+            };
+        } finally {
+            await fh.close();
         }
-        console.error("[audiofile resource] Serving file:", pathStr);
-        const data = await fs.readFile(pathStr, { encoding: "base64" });
-        console.error("[audiofile resource] File size (base64):", data.length);
-        return {
-            contents: [
-                { uri: uri.href, mimeType: "application/octet-stream", blob: data },
-            ],
-        };
-    }
+    },
 );
 
-
-async function main() {
+async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
 }

@@ -1,11 +1,11 @@
 import {
     Input,
     ALL_FORMATS,
-    BlobSource,
     AudioBufferSink,
     InputDisposedError,
     UnsupportedInputFormatError,
     type InputAudioTrack,
+    type Source,
     type WrappedAudioBuffer,
 } from "mediabunny";
 
@@ -42,7 +42,7 @@ type InputLike = {
 
 export type WebAudioPlayerDeps = {
     createContext?: () => AudioContext;
-    createInput?: (blob: Blob) => InputLike;
+    createInput?: (source: Source) => InputLike;
     createSink?: (track: InputAudioTrack) => SinkLike;
 };
 
@@ -63,15 +63,14 @@ export type WebAudioPlayer = EventTarget & {
 type LoopRange = { start: number; end: number };
 
 export function createWebAudioPlayer(
-    blob: Blob,
+    source: Source,
     deps: WebAudioPlayerDeps = {},
 ): WebAudioPlayer {
     const ctxFactory =
         deps.createContext ?? (() => new AudioContext());
     const inputFactory =
         deps.createInput ??
-        ((b: Blob) =>
-            new Input({ formats: ALL_FORMATS, source: new BlobSource(b) }));
+        ((s: Source) => new Input({ formats: ALL_FORMATS, source: s }));
     const sinkFactory =
         deps.createSink ?? ((t: InputAudioTrack) => new AudioBufferSink(t));
 
@@ -211,7 +210,7 @@ export function createWebAudioPlayer(
 
     async function load(): Promise<void> {
         try {
-            input = inputFactory(blob);
+            input = inputFactory(source);
             const track = await input.getPrimaryAudioTrack();
             if (destroyed) return;
             if (!track) {

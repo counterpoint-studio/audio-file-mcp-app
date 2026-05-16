@@ -1,10 +1,10 @@
 import {
     Input,
     ALL_FORMATS,
-    BlobSource,
     AudioSampleSink,
     type InputAudioTrack,
     type AudioSample,
+    type Source,
 } from "mediabunny";
 
 export type DecodeChunk = {
@@ -26,7 +26,7 @@ export type DecodeOptions = {
     isAborted?: () => boolean;
     yieldEveryMs?: number;
     /** Factory hook for tests. */
-    inputFactory?: (blob: Blob) => InputLike;
+    inputFactory?: (source: Source) => InputLike;
     /** Factory hook for tests. */
     sinkFactory?: (track: InputAudioTrack) => SinkLike;
 };
@@ -38,18 +38,17 @@ const DEFAULT_YIELD_MS = 16;
 // AudioBufferSink, by contrast, constructs AudioBuffer objects which only
 // exist on the main thread.
 export async function decodeWithMediabunny(
-    blob: Blob,
+    source: Source,
     opts: DecodeOptions,
 ): Promise<void> {
     const inputFactory =
         opts.inputFactory ??
-        ((b: Blob) =>
-            new Input({ formats: ALL_FORMATS, source: new BlobSource(b) }));
+        ((s: Source) => new Input({ formats: ALL_FORMATS, source: s }));
     const sinkFactory =
         opts.sinkFactory ?? ((t: InputAudioTrack) => new AudioSampleSink(t));
     const yieldEveryMs = opts.yieldEveryMs ?? DEFAULT_YIELD_MS;
 
-    const input = inputFactory(blob);
+    const input = inputFactory(source);
     // Pool the channel buffers and the outer array. WebCodecs sample sizes are
     // typically stable per codec (AAC=1024, MP3=1152, Opus=20 ms multiples),
     // so after the first sample we usually reuse the same backing storage for

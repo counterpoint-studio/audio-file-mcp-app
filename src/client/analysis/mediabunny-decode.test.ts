@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { decodeWithMediabunny, type DecodeChunk } from "./mediabunny-decode";
-import type { AudioSample, InputAudioTrack } from "mediabunny";
+import type { AudioSample, InputAudioTrack, Source } from "mediabunny";
+
+function fakeSource(): Source {
+    return {} as unknown as Source;
+}
 
 type SampleCopyOptions = {
     planeIndex: number;
@@ -83,7 +87,7 @@ describe("decodeWithMediabunny", () => {
             firstChannelLength: number;
         };
         const snaps: Snap[] = [];
-        await decodeWithMediabunny(new Blob([new Uint8Array([1])]), {
+        await decodeWithMediabunny(fakeSource(), {
             onChunk: (c) =>
                 snaps.push({
                     sampleRate: c.sampleRate,
@@ -117,7 +121,7 @@ describe("decodeWithMediabunny", () => {
             makeSample(2, 48000, 1024, 0.2),
         ];
         const refs: Float32Array[][] = [];
-        await decodeWithMediabunny(new Blob([new Uint8Array([1])]), {
+        await decodeWithMediabunny(fakeSource(), {
             onChunk: (c) => refs.push([...c.channelData]),
             yieldEveryMs: 1_000_000,
             inputFactory: () => ({
@@ -140,7 +144,7 @@ describe("decodeWithMediabunny", () => {
         const dispose = vi.fn();
         let aborted = false;
         const chunks: DecodeChunk[] = [];
-        await decodeWithMediabunny(new Blob([new Uint8Array([1])]), {
+        await decodeWithMediabunny(fakeSource(), {
             onChunk: (c) => {
                 chunks.push(c);
                 aborted = true;
@@ -160,7 +164,7 @@ describe("decodeWithMediabunny", () => {
     it("throws and disposes when there is no audio track", async () => {
         const dispose = vi.fn();
         await expect(
-            decodeWithMediabunny(new Blob([new Uint8Array([1])]), {
+            decodeWithMediabunny(fakeSource(), {
                 onChunk: () => {},
                 inputFactory: () => ({
                     getPrimaryAudioTrack: async () => null,

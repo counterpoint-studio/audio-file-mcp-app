@@ -1,3 +1,4 @@
+import type { Source } from "mediabunny";
 import { type AudioFormat } from "./audio-formats";
 import { createLoopRegion, type LoopRegion, type RegionObserver } from "./loop-region";
 import { createMetrics, type LiveMetrics, type Metrics } from "./metrics";
@@ -6,6 +7,9 @@ import { createSpectrogram, type Spectrogram } from "./spectrogram";
 import { createTimeDisplay, type TimeDisplay } from "./time-display";
 import { createWaveform, type Waveform } from "./waveform";
 import { createWebAudioPlayer, type WebAudioPlayer } from "./web-audio-player";
+import type { ChunkStore } from "./chunk-store";
+import type { ChunkBus } from "./chunk-bus";
+import type { ChunkLoader } from "./chunk-loader";
 
 export type Player = {
     destroy(): void;
@@ -38,7 +42,10 @@ export type PlayerObserver = {
 };
 
 export function createPlayer(
-    blob: Blob,
+    source: Source,
+    chunkStore: ChunkStore,
+    chunkBus: ChunkBus,
+    loader: Pick<ChunkLoader, "request">,
     format: AudioFormat | null,
     button: HTMLButtonElement,
     seekBarEl: HTMLElement,
@@ -49,7 +56,7 @@ export function createPlayer(
     durationExact: boolean,
     observer?: PlayerObserver,
 ): Player {
-    const audio = createWebAudioPlayer(blob);
+    const audio = createWebAudioPlayer(source);
     audio.loop = true;
 
     const regionEl = requireChild(seekBarEl, "#loop-region");
@@ -76,7 +83,9 @@ export function createPlayer(
     );
     const seekBar: SeekBar = createSeekBar(audio, seekBarEl, loopRegion, timeDisplay.update);
     const waveform: Waveform = createWaveform(
-        blob,
+        chunkStore,
+        chunkBus,
+        loader,
         format,
         seekBarEl,
         durationSeconds,

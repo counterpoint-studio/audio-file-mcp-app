@@ -91,18 +91,16 @@ describe("parseMp3", () => {
         expect(parseMp3(new Uint8Array(64))).toBeNull();
     });
 
-    it("estimates duration via extractMetadata from bitrate and size (CBR)", async () => {
+    it("estimates duration via extractMetadata from bitrate and size (CBR)", () => {
         const bytes = loadFixture("mp3-cbr128-stereo-44100.mp3");
-        const blob = new Blob([bytes]);
-        const m = await extractMetadata("mp3", blob);
+        const m = extractMetadata("mp3", bytes, bytes.length);
         expect(m?.duration).toBeGreaterThan(0);
         expect(m?.durationExact).toBe(false);
     });
 
-    it("estimates duration via extractMetadata from bitrate and size (VBR Xing)", async () => {
+    it("estimates duration via extractMetadata from bitrate and size (VBR Xing)", () => {
         const bytes = loadFixture("mp3-vbr-xing-stereo-44100.mp3");
-        const blob = new Blob([bytes]);
-        const m = await extractMetadata("mp3", blob);
+        const m = extractMetadata("mp3", bytes, bytes.length);
         expect(m?.duration).toBeGreaterThan(0);
         expect(m?.durationExact).toBe(false);
     });

@@ -1,5 +1,6 @@
 export type DisplayAudioInit = {
     path: string;
+    sizeBytes?: number;
     playheadSeconds?: number;
     region?: { startSeconds: number; endSeconds: number };
 };
@@ -18,6 +19,16 @@ export function parseDisplayAudioInit(
     const sc = result.structuredContent;
     const init: DisplayAudioInit = { path };
     if (!sc || typeof sc !== "object") return init;
+
+    const sz = sc.sizeBytes;
+    if (
+        typeof sz === "number" &&
+        Number.isFinite(sz) &&
+        sz >= 0 &&
+        Number.isInteger(sz)
+    ) {
+        init.sizeBytes = sz;
+    }
 
     const ph = sc.playheadSeconds;
     if (typeof ph === "number" && Number.isFinite(ph) && ph >= 0) {
