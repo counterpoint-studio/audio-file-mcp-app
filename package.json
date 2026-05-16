@@ -19,8 +19,8 @@
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.7.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "audio-decode": "^3.10.1",
     "audio-type": "^2.4.1",
+    "mediabunny": "^1.45.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

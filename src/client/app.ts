@@ -4,8 +4,6 @@ import { wireTheme } from "./theme";
 import {
     sniffAudioFormat,
     audioFormatToMime,
-    audioFormatToDecodeFormat,
-    type AudioDecodeFormat,
     type AudioFormat,
 } from "./audio-formats";
 import { base64ToBlob } from "./base64-blob";
@@ -76,7 +74,6 @@ let keyWarned = false;
 type AudioState = {
     path: string;
     blob: Blob;
-    url: string;
     player: Player;
     display: MetadataDisplay;
     publisher: AudioContextPublisher;
@@ -84,7 +81,6 @@ type AudioState = {
 type LoadedAudio = {
     blob: Blob;
     format: AudioFormat | null;
-    decodeFormat: AudioDecodeFormat | null;
 };
 
 let currentAudio: AudioState | null = null;
@@ -128,14 +124,13 @@ app.ontoolresult = async (result) => {
         }
         if (myGen !== loadGen || loaded === null) return;
 
-        const { blob, format, decodeFormat } = loaded;
+        const { blob, format } = loaded;
         const metadata = await extractMetadata(format, blob);
         if (myGen !== loadGen) return;
 
         const durationSeconds = metadata?.duration ?? null;
         const durationExact = metadata?.durationExact ?? false;
 
-        const url = URL.createObjectURL(blob);
         const publisher = createAudioContextPublisher((s) =>
             coordinator.submitLocal(s),
         );
@@ -146,9 +141,8 @@ app.ontoolresult = async (result) => {
         publisher.setPosition(0, null);
 
         const player = createPlayer(
-            url,
             blob,
-            decodeFormat,
+            format,
             playPauseBtn,
             seekBarEl,
             positionEl,
@@ -182,7 +176,7 @@ app.ontoolresult = async (result) => {
         );
         const display = createMetadataDisplay(metadataEl, player.worker);
         display.update(metadata, filePath);
-        currentAudio = { path: filePath, blob, url, player, display, publisher };
+        currentAudio = { path: filePath, blob, player, display, publisher };
         applyInitialState(currentAudio, init, () => myGen === loadGen);
     } finally {
         if (myGen === loadGen) {
@@ -232,7 +226,6 @@ function releaseCurrent(): void {
         currentAudio.display.destroy();
         currentAudio.player.destroy();
         currentAudio.publisher.destroy();
-        URL.revokeObjectURL(currentAudio.url);
         currentAudio = null;
     }
 }
@@ -256,11 +249,10 @@ async function loadAudio(
 
     const format = sniffAudioFormat(base64);
     const mime = audioFormatToMime(format);
-    const decodeFormat = audioFormatToDecodeFormat(format);
     const strt = performance.now();
     const blob = await base64ToBlob(base64, mime, stillCurrent);
     console.log(`Decoded base64 to blob in ${(performance.now() - strt).toFixed(2)} ms`);
     base64 = null;
     if (blob === null) return null;
-    return { blob, format, decodeFormat };
+    return { blob, format };
 }

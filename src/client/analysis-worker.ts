@@ -2,7 +2,6 @@
 declare const self: DedicatedWorkerGlobalScope;
 export {};
 
-import decode, { type DecodedChunk } from "audio-decode";
 import { AnalysisPipeline } from "./analysis/pipeline";
 import { FrameRouter } from "./analysis/frame-router";
 import { LoudnessAnalyzer, type LoudnessSummary } from "./analysis/loudness";
@@ -11,13 +10,10 @@ import { SpectrogramAnalyzer } from "./analysis/spectrogram";
 import { TimeSeriesStore } from "./analysis/time-series";
 import { WaveformBandEnergyAnalyzer } from "./analysis/waveform-band-energy";
 import { WaveformPeaksAnalyzer } from "./analysis/waveform-peaks";
-import {
-    STREAMABLE_DECODE_FORMATS,
-    type AudioDecodeFormat,
-} from "./audio-formats";
+import { isMediabunnySupported, type AudioFormat } from "./audio-formats";
 import { shouldApplyFinalDuration } from "./analysis/duration-correction";
 import { instantiate as instantiateDsp } from "./dsp/wasm-dsp.gen";
-import { boundWavBlob } from "./wav-data-bound";
+import { decodeWithMediabunny } from "./analysis/mediabunny-decode";
 
 type InitMsg = {
     type: "init";
@@ -26,7 +22,7 @@ type InitMsg = {
     cssHeight: number;
     dpr: number;
     blob: Blob;
-    format: AudioDecodeFormat | null;
+    format: AudioFormat | null;
     durationSeconds: number | null;
     durationExact: boolean;
     theme: "light" | "dark";
@@ -144,67 +140,28 @@ self.onmessage = (e: MessageEvent<InMsg>) => {
     }
 };
 
-type StreamingDecoderFn = (
-    s: ReadableStream<Uint8Array>,
-) => AsyncIterable<DecodedChunk>;
-
-function streamingDecoder(format: AudioDecodeFormat): StreamingDecoderFn {
-    return decode[format] as unknown as StreamingDecoderFn;
-}
-
-function wholeFileDecoder(
-    format: AudioDecodeFormat,
-): (input: ArrayBuffer | Uint8Array) => Promise<DecodedChunk> {
-    return decode[format];
-}
-
-async function runStreaming(
-    blob: Blob,
-    format: AudioDecodeFormat,
-): Promise<void> {
-    const decoder = streamingDecoder(format);
-    const stream = blob.stream();
-    let lastYieldAt = performance.now();
-    for await (const chunk of decoder(stream)) {
-        if (decodeAbort) return;
-        pipeline.feed(chunk);
-        maybePostDecoderInfo();
-        maybePostLive();
-        // Yield to the macrotask queue periodically so OffscreenCanvas commits
-        // reach the displayed placeholder canvas during decode rather than only
-        // after the for-await loop returns.
-        const now = performance.now();
-        if (now - lastYieldAt >= 16) {
-            lastYieldAt = now;
-            await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        }
-    }
-}
-
 async function startDecode(
     blob: Blob,
-    format: AudioDecodeFormat | null,
+    format: AudioFormat | null,
 ): Promise<void> {
-    if (!format) {
+    if (!isMediabunnySupported(format)) {
         self.postMessage({ type: "done", reason: "unsupported" });
         return;
     }
     try {
         await dspReady;
         if (decodeAbort) return;
-        if (STREAMABLE_DECODE_FORMATS.has(format)) {
-            const sourceBlob = format === "wav" ? await boundWavBlob(blob) : blob;
-            if (decodeAbort) return;
-            await runStreaming(sourceBlob, format);
-        } else {
-            const buf = await blob.arrayBuffer();
-            if (decodeAbort) return;
-            const result = await wholeFileDecoder(format)(buf);
-            if (decodeAbort) return;
-            pipeline.feed(result);
-            maybePostDecoderInfo();
-            maybePostLive();
-        }
+
+        await decodeWithMediabunny(blob, {
+            isAborted: () => decodeAbort,
+            onChunk: (chunk) => {
+                pipeline.feed(chunk);
+                maybePostDecoderInfo();
+                maybePostLive();
+            },
+        });
+        if (decodeAbort) return;
+
         pipeline.finalize();
         applyFinalDuration();
         loudnessSummary = loudness.summary();

@@ -4,6 +4,7 @@ import {
     formatDbFromLinear,
 } from "./metrics-format";
 import { formatTime } from "./time-display";
+import type { WebAudioPlayer } from "./web-audio-player";
 
 export type LiveMetrics = {
     samplePeak: number;
@@ -43,7 +44,7 @@ type SampleCells = {
 export function createMetrics(
     worker: Worker,
     seekBarEl: HTMLElement,
-    audio: HTMLAudioElement,
+    audio: WebAudioPlayer,
 ): Metrics {
     const globalCells = readGlobalCells();
     const sampleCells = readSampleCells();

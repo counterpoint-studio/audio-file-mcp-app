@@ -1,4 +1,5 @@
 import { formatTime } from "./time-display";
+import type { WebAudioPlayer } from "./web-audio-player";
 
 export type LoopRegion = {
     setPreview(p1: number, p2: number): void;
@@ -22,19 +23,8 @@ export function normalizeRegion(p1: number, p2: number): { start: number; end: n
     return a <= b ? { start: a, end: b } : { start: b, end: a };
 }
 
-export function enforceLoop(
-    currentTime: number,
-    loopStart: number,
-    loopEnd: number,
-): number | null {
-    if (!(loopEnd > loopStart)) return null;
-    if (currentTime >= loopEnd) return loopStart;
-    if (currentTime < loopStart) return loopStart;
-    return null;
-}
-
 export function createLoopRegion(
-    audio: HTMLAudioElement,
+    audio: WebAudioPlayer,
     _seekBarEl: HTMLElement,
     regionEl: HTMLElement,
     statsEl: HTMLElement,
@@ -42,9 +32,6 @@ export function createLoopRegion(
     endEl: HTMLElement,
     observer?: RegionObserver,
 ): LoopRegion {
-    let rafId = 0;
-    let loopStartSec = 0;
-    let loopEndSec = 0;
     let hasRegion = false;
 
     const setVars = (start: number, end: number) => {
@@ -52,39 +39,6 @@ export function createLoopRegion(
         regionEl.style.setProperty("--loop-end", String(end));
     };
 
-    const tick = () => {
-        if (hasRegion && !audio.paused) {
-            const corrected = enforceLoop(audio.currentTime, loopStartSec, loopEndSec);
-            if (corrected !== null) {
-                audio.currentTime = corrected;
-            }
-        }
-        rafId = requestAnimationFrame(tick);
-    };
-
-    const startRaf = () => {
-        if (rafId === 0) {
-            rafId = requestAnimationFrame(tick);
-        }
-    };
-
-    const stopRaf = () => {
-        if (rafId !== 0) {
-            cancelAnimationFrame(rafId);
-            rafId = 0;
-        }
-    };
-
-    const onEnded = () => {
-        if (hasRegion) {
-            audio.currentTime = loopStartSec;
-            void audio.play();
-        }
-    };
-
-    audio.addEventListener("ended", onEnded);
-
-    audio.loop = true;
     regionEl.hidden = true;
     statsEl.hidden = true;
     setVars(0, 0);
@@ -112,34 +66,27 @@ export function createLoopRegion(
             const endClamped = Math.max(0, Math.min(duration, endSec));
             const start = Math.min(startClamped, endClamped);
             const end = Math.max(startClamped, endClamped);
-            loopStartSec = start;
-            loopEndSec = end;
             hasRegion = true;
-            audio.loop = false;
+            audio.setLoopRegion(start, end);
             setVars(start / duration, end / duration);
             regionEl.hidden = false;
             startEl.textContent = formatTime(start);
             endEl.textContent = formatTime(end);
             statsEl.hidden = false;
-            startRaf();
             observer?.onCommit?.(start, end);
         },
         clearRegion() {
-            audio.loop = true;
+            hasRegion = false;
+            audio.clearLoopRegion();
             regionEl.hidden = true;
             statsEl.hidden = true;
             startEl.textContent = "00:00.000";
             endEl.textContent = "00:00.000";
             setVars(0, 0);
-            loopStartSec = 0;
-            loopEndSec = 0;
-            hasRegion = false;
-            stopRaf();
             observer?.onCleared?.();
         },
         destroy() {
-            stopRaf();
-            audio.removeEventListener("ended", onEnded);
+            // No persistent listeners: the facade owns loop-region playback.
         },
     };
 }

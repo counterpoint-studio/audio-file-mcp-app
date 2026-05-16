@@ -1,12 +1,12 @@
 import WaveformWorker from "./analysis-worker.ts?worker&inline";
-import { type AudioDecodeFormat } from "./audio-formats";
+import { type AudioFormat } from "./audio-formats";
 import { getTheme, subscribeTheme } from "./theme";
 
 export type Waveform = { destroy(): void; worker: Worker };
 
 export function createWaveform(
     blob: Blob,
-    decodeFormat: AudioDecodeFormat | null,
+    format: AudioFormat | null,
     seekBarEl: HTMLElement,
     durationSeconds: number | null,
     durationExact: boolean,
@@ -31,7 +31,7 @@ export function createWaveform(
             cssHeight: initSize.height,
             dpr: window.devicePixelRatio,
             blob,
-            format: decodeFormat,
+            format,
             durationSeconds,
             durationExact,
             theme: getTheme(),

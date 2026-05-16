@@ -1,10 +1,12 @@
+import type { WebAudioPlayer } from "./web-audio-player";
+
 export type TimeDisplay = {
     update(progress: number): void;
     destroy(): void;
 };
 
 export function createTimeDisplay(
-    audio: HTMLAudioElement,
+    audio: WebAudioPlayer,
     positionEl: HTMLElement,
     durationEl: HTMLElement,
 ): TimeDisplay {

@@ -1,25 +1,26 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createLoopRegion, type RegionObserver } from "./loop-region";
+import type { WebAudioPlayer } from "./web-audio-player";
 
-type EventListener = (e: unknown) => void;
-
-function fakeAudio(duration = 100): HTMLAudioElement {
-    const listeners = new Map<string, Set<EventListener>>();
+function fakeAudio(duration = 100) {
+    const setLoopRegion = vi.fn();
+    const clearLoopRegion = vi.fn();
     const a: Record<string, unknown> = {
         duration,
         currentTime: 0,
         paused: true,
         loop: false,
-        addEventListener(type: string, fn: EventListener) {
-            if (!listeners.has(type)) listeners.set(type, new Set());
-            listeners.get(type)!.add(fn);
-        },
-        removeEventListener(type: string, fn: EventListener) {
-            listeners.get(type)?.delete(fn);
-        },
-        play: vi.fn().mockResolvedValue(undefined),
+        setLoopRegion,
+        clearLoopRegion,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn().mockReturnValue(true),
     };
-    return a as unknown as HTMLAudioElement;
+    return {
+        audio: a as unknown as WebAudioPlayer,
+        setLoopRegion,
+        clearLoopRegion,
+    };
 }
 
 function fakeEl(): HTMLElement {
@@ -33,19 +34,8 @@ function fakeEl(): HTMLElement {
     return e as unknown as HTMLElement;
 }
 
-beforeEach(() => {
-    (globalThis as unknown as { requestAnimationFrame: (fn: () => void) => number })
-        .requestAnimationFrame = () => 1;
-    (globalThis as unknown as { cancelAnimationFrame: (id: number) => void })
-        .cancelAnimationFrame = () => undefined;
-});
-afterEach(() => {
-    delete (globalThis as Record<string, unknown>).requestAnimationFrame;
-    delete (globalThis as Record<string, unknown>).cancelAnimationFrame;
-});
-
 function setup(duration = 100) {
-    const audio = fakeAudio(duration);
+    const { audio, setLoopRegion, clearLoopRegion } = fakeAudio(duration);
     const seekBarEl = fakeEl();
     const regionEl = fakeEl();
     const statsEl = fakeEl();
@@ -65,7 +55,7 @@ function setup(duration = 100) {
         endEl,
         observer,
     );
-    return { audio, lr, observer };
+    return { audio, lr, observer, setLoopRegion, clearLoopRegion };
 }
 
 describe("createLoopRegion observer", () => {
@@ -88,15 +78,17 @@ describe("createLoopRegion observer", () => {
         expect(observer.onPreview).not.toHaveBeenCalled();
     });
 
-    it("setRegion fires onCommit with clamped seconds", () => {
-        const { lr, observer } = setup(100);
+    it("setRegion fires onCommit and delegates to facade", () => {
+        const { lr, observer, setLoopRegion } = setup(100);
         lr.setRegion(120, 30); // out of bounds + reversed
         expect(observer.onCommit).toHaveBeenCalledWith(30, 100);
+        expect(setLoopRegion).toHaveBeenCalledWith(30, 100);
     });
 
-    it("clearRegion fires onCleared", () => {
-        const { lr, observer } = setup(100);
+    it("clearRegion fires onCleared and delegates to facade", () => {
+        const { lr, observer, clearLoopRegion } = setup(100);
         lr.clearRegion();
         expect(observer.onCleared).toHaveBeenCalledTimes(1);
+        expect(clearLoopRegion).toHaveBeenCalled();
     });
 });

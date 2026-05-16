@@ -24,11 +24,17 @@ export class AnalysisPipeline {
                 a.init(this.sampleRate, this.numChannels);
             }
             this.initialized = true;
+        } else if (incoming.length !== this.numChannels) {
+            // Mediabunny emits stable channel counts per buffer; a mismatch
+            // here is a decoder regression, not silent input data we should
+            // paper over.
+            throw new Error(
+                `AnalysisPipeline: chunk channel count ${incoming.length} differs from initial ${this.numChannels}`,
+            );
         }
 
-        const channelData = this.normalizeChannels(incoming);
         const ac: AnalyzerChunk = {
-            channelData,
+            channelData: incoming,
             sampleRate: this.sampleRate,
             startSample: this.decodedSamples,
         };
@@ -51,19 +57,5 @@ export class AnalysisPipeline {
 
     get sampleRateObserved(): number {
         return this.sampleRate;
-    }
-
-    // Coerce a chunk's channel layout to the count we initialized with.
-    // audio-decode collapses stereo→mono per chunk when L≡R at every 37th
-    // sample (see audio-decode.js norm()), so a real stereo file can flicker
-    // to 1ch on silent passages. We invert that here so loudness (which
-    // requires a fixed channel count) keeps working.
-    private normalizeChannels(channels: Float32Array[]): Float32Array[] {
-        if (channels.length === this.numChannels) return channels;
-        const out: Float32Array[] = new Array(this.numChannels);
-        for (let c = 0; c < this.numChannels; c++) {
-            out[c] = channels[c % channels.length];
-        }
-        return out;
     }
 }

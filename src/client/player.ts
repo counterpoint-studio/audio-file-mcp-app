@@ -1,14 +1,15 @@
-import { type AudioDecodeFormat } from "./audio-formats";
+import { type AudioFormat } from "./audio-formats";
 import { createLoopRegion, type LoopRegion, type RegionObserver } from "./loop-region";
 import { createMetrics, type LiveMetrics, type Metrics } from "./metrics";
 import { createSeekBar, type SeekBar } from "./seek-bar";
 import { createSpectrogram, type Spectrogram } from "./spectrogram";
 import { createTimeDisplay, type TimeDisplay } from "./time-display";
 import { createWaveform, type Waveform } from "./waveform";
+import { createWebAudioPlayer, type WebAudioPlayer } from "./web-audio-player";
 
 export type Player = {
     destroy(): void;
-    audio: HTMLAudioElement;
+    audio: WebAudioPlayer;
     worker: Worker;
     loopRegion: LoopRegion;
 };
@@ -37,9 +38,8 @@ export type PlayerObserver = {
 };
 
 export function createPlayer(
-    url: string,
     blob: Blob,
-    decodeFormat: AudioDecodeFormat | null,
+    format: AudioFormat | null,
     button: HTMLButtonElement,
     seekBarEl: HTMLElement,
     positionEl: HTMLElement,
@@ -49,8 +49,7 @@ export function createPlayer(
     durationExact: boolean,
     observer?: PlayerObserver,
 ): Player {
-    const audio = new Audio(url);
-    audio.preload = "auto";
+    const audio = createWebAudioPlayer(blob);
     audio.loop = true;
 
     const regionEl = requireChild(seekBarEl, "#loop-region");
@@ -78,7 +77,7 @@ export function createPlayer(
     const seekBar: SeekBar = createSeekBar(audio, seekBarEl, loopRegion, timeDisplay.update);
     const waveform: Waveform = createWaveform(
         blob,
-        decodeFormat,
+        format,
         seekBarEl,
         durationSeconds,
         durationExact,
@@ -155,8 +154,13 @@ export function createPlayer(
     const onAudioError = () => {
         if (destroyed) return;
         const err = audio.error;
-        const message = err ? mediaErrorMessage(err) : undefined;
-        observer?.onDecodeError?.("playback-unsupported", message);
+        if (!err) {
+            observer?.onDecodeError?.("playback-unsupported");
+            return;
+        }
+        const kind: PlayerDecodeErrorKind =
+            err.kind === "unsupported" ? "unsupported" : "decode-failed";
+        observer?.onDecodeError?.(kind, err.message || undefined);
     };
 
     button.addEventListener("click", onClick);
@@ -200,25 +204,9 @@ export function createPlayer(
             audio.removeEventListener("timeupdate", onTimeUpdate);
             audio.removeEventListener("error", onAudioError);
             audio.pause();
-            audio.removeAttribute("src");
-            audio.load();
+            audio.destroy();
             button.disabled = true;
             setPlaying(false);
         },
     };
-}
-
-function mediaErrorMessage(err: MediaError): string {
-    switch (err.code) {
-        case 1: // MEDIA_ERR_ABORTED
-            return "playback aborted";
-        case 2: // MEDIA_ERR_NETWORK
-            return "network error";
-        case 3: // MEDIA_ERR_DECODE
-            return "decode error";
-        case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-            return "source not supported";
-        default:
-            return err.message || "";
-    }
 }

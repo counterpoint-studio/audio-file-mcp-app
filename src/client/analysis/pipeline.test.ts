@@ -133,27 +133,22 @@ describe("AnalysisPipeline", () => {
         expect(p.totalSamples).toBe(0);
     });
 
-    it("coerces a later chunk's channel count to match the initial chunk (mono after stereo duplicates the mono channel)", () => {
+    it("throws when a later chunk's channel count differs from the initial chunk", () => {
         const a = recordingAnalyzer();
         const p = new AnalysisPipeline([a]);
         p.feed(chunk(100, 2));
         const monoSamples = new Float32Array(100);
-        monoSamples[0] = 0.5;
-        p.feed({ sampleRate: 44100, channelData: [monoSamples] });
-        expect(a.initCalls[0].numChannels).toBe(2);
-        expect(a.feedCalls).toHaveLength(2);
-        const second = a.feedCalls[1];
-        expect(second.channelData).toHaveLength(2);
-        expect(second.channelData[0]).toBe(monoSamples);
-        expect(second.channelData[1]).toBe(monoSamples);
-        expect(p.totalSamples).toBe(200);
+        expect(() =>
+            p.feed({ sampleRate: 44100, channelData: [monoSamples] }),
+        ).toThrow(/channel count 1 differs from initial 2/);
     });
 
-    it("truncates extra channels in a later chunk to match the initial channel count", () => {
+    it("throws when a later chunk supplies extra channels", () => {
         const a = recordingAnalyzer();
         const p = new AnalysisPipeline([a]);
         p.feed(chunk(50, 1));
-        p.feed(chunk(50, 3));
-        expect(a.feedCalls[1].channelData).toHaveLength(1);
+        expect(() => p.feed(chunk(50, 3))).toThrow(
+            /channel count 3 differs from initial 1/,
+        );
     });
 });

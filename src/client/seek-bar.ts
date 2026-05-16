@@ -1,4 +1,5 @@
 import { type LoopRegion, normalizeRegion } from "./loop-region";
+import type { WebAudioPlayer } from "./web-audio-player";
 
 export type SeekBar = {
     destroy(): void;
@@ -15,7 +16,7 @@ export function gestureKind(
 }
 
 export function createSeekBar(
-    audio: HTMLAudioElement,
+    audio: WebAudioPlayer,
     seekBarEl: HTMLElement,
     loopRegion: LoopRegion,
     onProgress?: (progress: number) => void,
