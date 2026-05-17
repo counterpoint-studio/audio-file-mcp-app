@@ -24,14 +24,11 @@ type SinkLike = {
 export type DecodeOptions = {
     onChunk: (chunk: DecodeChunk) => void;
     isAborted?: () => boolean;
-    yieldEveryMs?: number;
     /** Factory hook for tests. */
     inputFactory?: (source: Source) => InputLike;
     /** Factory hook for tests. */
     sinkFactory?: (track: InputAudioTrack) => SinkLike;
 };
-
-const DEFAULT_YIELD_MS = 16;
 
 // Worker-safe decode: AudioSampleSink yields AudioSample (a wrapper around the
 // WebCodecs AudioData primitive), which is available in DedicatedWorkerGlobalScope.
@@ -46,7 +43,6 @@ export async function decodeWithMediabunny(
         ((s: Source) => new Input({ formats: ALL_FORMATS, source: s }));
     const sinkFactory =
         opts.sinkFactory ?? ((t: InputAudioTrack) => new AudioSampleSink(t));
-    const yieldEveryMs = opts.yieldEveryMs ?? DEFAULT_YIELD_MS;
 
     const input = inputFactory(source);
     // Pool the channel buffers and the outer array. WebCodecs sample sizes are
@@ -62,8 +58,6 @@ export async function decodeWithMediabunny(
         if (!track) throw new Error("no audio track");
         if (opts.isAborted?.()) return;
         const sink = sinkFactory(track);
-        let lastYieldAt =
-            typeof performance !== "undefined" ? performance.now() : 0;
         for await (const sample of sink.samples()) {
             try {
                 if (opts.isAborted?.()) return;
@@ -93,12 +87,6 @@ export async function decodeWithMediabunny(
                 });
             } finally {
                 sample.close();
-            }
-            const now =
-                typeof performance !== "undefined" ? performance.now() : 0;
-            if (now - lastYieldAt >= yieldEveryMs) {
-                lastYieldAt = now;
-                await new Promise<void>((r) => setTimeout(r, 0));
             }
         }
     } finally {

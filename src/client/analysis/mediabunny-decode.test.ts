@@ -95,7 +95,6 @@ describe("decodeWithMediabunny", () => {
                     firstSamples: c.channelData.map((arr) => arr[0]),
                     firstChannelLength: c.channelData[0].length,
                 }),
-            yieldEveryMs: 1_000_000, // suppress yield in test
             inputFactory: () => ({
                 getPrimaryAudioTrack: async () => fakeTrack(),
                 dispose,
@@ -123,7 +122,6 @@ describe("decodeWithMediabunny", () => {
         const refs: Float32Array[][] = [];
         await decodeWithMediabunny(fakeSource(), {
             onChunk: (c) => refs.push([...c.channelData]),
-            yieldEveryMs: 1_000_000,
             inputFactory: () => ({
                 getPrimaryAudioTrack: async () => fakeTrack(),
                 dispose: vi.fn(),
@@ -150,7 +148,6 @@ describe("decodeWithMediabunny", () => {
                 aborted = true;
             },
             isAborted: () => aborted,
-            yieldEveryMs: 1_000_000,
             inputFactory: () => ({
                 getPrimaryAudioTrack: async () => fakeTrack(),
                 dispose,
