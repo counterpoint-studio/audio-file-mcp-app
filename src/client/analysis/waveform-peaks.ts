@@ -9,7 +9,7 @@ import { GrowablePeaks } from "./growable-peaks";
 import type { WaveformBandEnergyAnalyzer } from "./waveform-band-energy";
 
 const PEAKS_PER_SECOND = 200;
-const REDRAW_INTERVAL_MS = 50;
+const REDRAW_INTERVAL_MS = 100;
 
 export class WaveformPeaksAnalyzer implements Analyzer {
     private peaks = new GrowablePeaks(60 * PEAKS_PER_SECOND);

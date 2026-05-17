@@ -9,7 +9,7 @@ import {
 
 const MAX_COLS = 4000;
 const NUM_BINS = 256;
-const REDRAW_INTERVAL_MS = 50;
+const REDRAW_INTERVAL_MS = 100;
 const MIN_HZ = 20;
 const FLOOR_DB = -100;
 const CEIL_DB = 0;
@@ -95,6 +95,12 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
     private cssHeight = 0;
     private dpr = 1;
     private lastRedrawAt = 0;
+    // Reusable scratch surfaces for redraw — sized once for the worst case
+    // (MAX_COLS × NUM_BINS). Allocating fresh on every redraw at 10 Hz over a
+    // multi-minute decode is meaningful GC pressure.
+    private rgbaBuf: Uint8ClampedArray | null = null;
+    private tempCanvas: OffscreenCanvas | null = null;
+    private tempCtx: OffscreenCanvasRenderingContext2D | null = null;
 
     setCanvas(
         canvas: OffscreenCanvas,
@@ -261,20 +267,33 @@ export class SpectrogramAnalyzer implements FrameConsumer, Analyzer {
         );
 
         const rgbaBytes = decodedCols * NUM_BINS * 4;
-        const buf = new Uint8ClampedArray(rgbaBytes);
-        buf.set(mod.HEAPU8.subarray(this.outPtr, this.outPtr + rgbaBytes));
-        const imgData = new ImageData(buf, decodedCols, NUM_BINS);
+        if (!this.rgbaBuf) {
+            this.rgbaBuf = new Uint8ClampedArray(MAX_COLS * NUM_BINS * 4);
+        }
+        const bufView = new Uint8ClampedArray(
+            this.rgbaBuf.buffer as ArrayBuffer,
+            0,
+            rgbaBytes,
+        );
+        bufView.set(mod.HEAPU8.subarray(this.outPtr, this.outPtr + rgbaBytes));
+        const imgData = new ImageData(bufView, decodedCols, NUM_BINS);
 
-        const tmp = new OffscreenCanvas(decodedCols, NUM_BINS);
-        const tctx = tmp.getContext("2d");
-        if (!tctx) return;
-        tctx.putImageData(imgData, 0, 0);
+        if (!this.tempCanvas) {
+            this.tempCanvas = new OffscreenCanvas(MAX_COLS, NUM_BINS);
+            this.tempCtx = this.tempCanvas.getContext("2d");
+        }
+        if (!this.tempCtx) return;
+        this.tempCtx.putImageData(imgData, 0, 0);
 
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "low";
-        ctx.drawImage(tmp, 0, 0, decodedCols, NUM_BINS, 0, 0, offsetW, offsetH);
+        ctx.drawImage(
+            this.tempCanvas,
+            0, 0, decodedCols, NUM_BINS,
+            0, 0, offsetW, offsetH,
+        );
         ctx.restore();
 
         this.drawGrid();
