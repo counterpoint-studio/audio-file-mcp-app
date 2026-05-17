@@ -320,11 +320,19 @@ async function mcpRangeFetcher(
     const uri = `audiofile-range://${encodeURIComponent(path)}/${start}/${length}`;
     const result = await app.readServerResource({ uri });
     const content = result.contents[0];
-    if (!content || !("blob" in content) || typeof content.blob !== "string") {
-        throw new Error("expected blob content from range resource");
+    // The server returns base64 in `text` rather than `blob` because Goose's
+    // MCP-Apps host only forwards `text` resource content to the iframe.
+    // Accept either for compatibility with other hosts.
+    const b64 =
+        content && "text" in content && typeof content.text === "string"
+            ? content.text
+            : content && "blob" in content && typeof content.blob === "string"
+              ? content.blob
+              : null;
+    if (b64 === null) {
+        throw new Error("expected blob/text content from range resource");
     }
-    const bytes = Uint8Array.fromBase64(content.blob);
-    return bytes;
+    return Uint8Array.fromBase64(b64);
 }
 
 function waitForFirstChunk(

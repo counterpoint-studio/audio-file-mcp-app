@@ -104,6 +104,8 @@ registerAppResource(
 
 const MAX_CHUNK_BYTES = 8 * 1024 * 1024;
 
+// Base64 is returned in the `text` field rather than `blob` because Goose's
+// MCP-Apps host only forwards `text` resource content to the iframe.
 server.registerResource(
     "audiofile-range",
     new ResourceTemplate("audiofile-range://{path}/{start}/{length}", {
@@ -111,8 +113,8 @@ server.registerResource(
     }),
     {
         description:
-            "Byte range of a local audio file as a base64 blob; path/start/length are URL-encoded.",
-        mimeType: "application/octet-stream",
+            "Byte range of a local audio file as base64 in `text`; path/start/length are URL-encoded.",
+        mimeType: "application/octet-stream;encoding=base64",
     },
     async (uri, { path, start, length }): Promise<ReadResourceResult> => {
         const rawPath = asScalar(path);
@@ -137,9 +139,8 @@ server.registerResource(
                 contents: [
                     {
                         uri: uri.href,
-                        mimeType: "application/octet-stream",
-                        blob: slice.toString("base64"),
-                        _meta: { start: startNum, length: bytesRead },
+                        mimeType: "application/octet-stream;encoding=base64",
+                        text: slice.toString("base64"),
                     },
                 ],
             };
