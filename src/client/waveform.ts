@@ -1,13 +1,16 @@
-import WaveformWorker from "./analysis-worker.ts?worker&inline";
+import {
+    createAnalysisWorker,
+    type AnalysisWorker,
+} from "./analysis-worker-factory";
 import { type AudioFormat } from "./audio-formats";
 import { getTheme, subscribeTheme } from "./theme";
 import type { ChunkStore } from "./chunk-store";
 import type { ChunkBus, ChunkEvent } from "./chunk-bus";
 import type { ChunkLoader } from "./chunk-loader";
 
-export type Waveform = { destroy(): void; worker: Worker };
+export type Waveform = { destroy(): void; worker: AnalysisWorker };
 
-export function createWaveform(
+export async function createWaveform(
     chunkStore: ChunkStore,
     chunkBus: ChunkBus,
     loader: Pick<ChunkLoader, "request">,
@@ -15,7 +18,7 @@ export function createWaveform(
     seekBarEl: HTMLElement,
     durationSeconds: number | null,
     durationExact: boolean,
-): Waveform {
+): Promise<Waveform> {
     // transferControlToOffscreen can only be called once per HTMLCanvasElement.
     // Replace the existing #waveform with a fresh canvas so subsequent loads
     // don't hit InvalidStateError on the second transfer.
@@ -25,7 +28,7 @@ export function createWaveform(
     canvas.id = "waveform";
     oldCanvas.replaceWith(canvas);
 
-    const worker = new WaveformWorker();
+    const worker = await createAnalysisWorker();
     const offscreen = canvas.transferControlToOffscreen();
     const initSize = canvas.getBoundingClientRect();
     worker.postMessage(

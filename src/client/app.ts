@@ -172,7 +172,7 @@ app.ontoolresult = async (result) => {
         publisher.setPlayback("paused");
         publisher.setPosition(0, null);
 
-        const player = createPlayer(
+        const player = await createPlayer(
             source,
             store,
             chunkBus,
@@ -209,6 +209,10 @@ app.ontoolresult = async (result) => {
                 },
             },
         );
+        if (myGen !== loadGen) {
+            player.destroy();
+            return;
+        }
         const display = createMetadataDisplay(metadataEl, player.worker);
         display.update(metadata, filePath);
         currentAudio = {

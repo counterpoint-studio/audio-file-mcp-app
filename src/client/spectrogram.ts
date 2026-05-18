@@ -1,7 +1,9 @@
+import type { AnalysisWorker } from "./analysis-worker-factory";
+
 export type Spectrogram = { destroy(): void };
 
 export function createSpectrogram(
-    worker: Worker,
+    worker: AnalysisWorker,
     wrapEl: HTMLElement,
 ): Spectrogram {
     // transferControlToOffscreen can only be called once per HTMLCanvasElement.

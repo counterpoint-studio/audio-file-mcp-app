@@ -1,4 +1,5 @@
 import type { Source } from "mediabunny";
+import type { AnalysisWorker } from "./analysis-worker-factory";
 import { type AudioFormat } from "./audio-formats";
 import { createLoopRegion, type LoopRegion, type RegionObserver } from "./loop-region";
 import { createMetrics, type LiveMetrics, type Metrics } from "./metrics";
@@ -14,7 +15,7 @@ import type { ChunkLoader } from "./chunk-loader";
 export type Player = {
     destroy(): void;
     audio: WebAudioPlayer;
-    worker: Worker;
+    worker: AnalysisWorker;
     loopRegion: LoopRegion;
 };
 
@@ -41,7 +42,7 @@ export type PlayerObserver = {
     onDecodeError?(kind: PlayerDecodeErrorKind, message?: string): void;
 };
 
-export function createPlayer(
+export async function createPlayer(
     source: Source,
     chunkStore: ChunkStore,
     chunkBus: ChunkBus,
@@ -55,7 +56,7 @@ export function createPlayer(
     durationSeconds: number | null,
     durationExact: boolean,
     observer?: PlayerObserver,
-): Player {
+): Promise<Player> {
     const audio = createWebAudioPlayer(source);
     audio.loop = true;
 
@@ -82,7 +83,7 @@ export function createPlayer(
         regionObserver,
     );
     const seekBar: SeekBar = createSeekBar(audio, seekBarEl, loopRegion, timeDisplay.update);
-    const waveform: Waveform = createWaveform(
+    const waveform: Waveform = await createWaveform(
         chunkStore,
         chunkBus,
         loader,

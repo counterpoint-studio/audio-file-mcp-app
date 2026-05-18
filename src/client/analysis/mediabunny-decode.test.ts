@@ -158,6 +158,63 @@ describe("decodeWithMediabunny", () => {
         expect(dispose).toHaveBeenCalled();
     });
 
+    it("yields between iterations when yieldEveryMs is set and the budget is exceeded", async () => {
+        const samples = [
+            makeSample(1, 48000, 256, 0.1),
+            makeSample(1, 48000, 256, 0.2),
+            makeSample(1, 48000, 256, 0.3),
+        ];
+        const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+        const nowSpy = vi.spyOn(performance, "now");
+        // Sequence: initial lastYieldAt baseline = 0; after first chunk
+        // (now=5) no yield; after second chunk (now=20) yield, reset baseline
+        // via now=20; after third chunk (now=25) no yield.
+        nowSpy.mockReturnValueOnce(0); // baseline
+        nowSpy.mockReturnValueOnce(5); // post-first-chunk
+        nowSpy.mockReturnValueOnce(20); // post-second-chunk → triggers yield
+        nowSpy.mockReturnValueOnce(20); // re-baseline after yield
+        nowSpy.mockReturnValueOnce(25); // post-third-chunk → no yield
+        try {
+            await decodeWithMediabunny(fakeSource(), {
+                onChunk: () => {},
+                yieldEveryMs: 16,
+                inputFactory: () => ({
+                    getPrimaryAudioTrack: async () => fakeTrack(),
+                    dispose: vi.fn(),
+                }),
+                sinkFactory: () => fakeSink(samples),
+            });
+            // Exactly one yield (after second chunk).
+            expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+            expect(setTimeoutSpy.mock.calls[0][1]).toBe(0);
+        } finally {
+            setTimeoutSpy.mockRestore();
+            nowSpy.mockRestore();
+        }
+    });
+
+    it("does not yield when yieldEveryMs is undefined", async () => {
+        const samples = [
+            makeSample(1, 48000, 256, 0.1),
+            makeSample(1, 48000, 256, 0.2),
+            makeSample(1, 48000, 256, 0.3),
+        ];
+        const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+        try {
+            await decodeWithMediabunny(fakeSource(), {
+                onChunk: () => {},
+                inputFactory: () => ({
+                    getPrimaryAudioTrack: async () => fakeTrack(),
+                    dispose: vi.fn(),
+                }),
+                sinkFactory: () => fakeSink(samples),
+            });
+            expect(setTimeoutSpy).not.toHaveBeenCalled();
+        } finally {
+            setTimeoutSpy.mockRestore();
+        }
+    });
+
     it("throws and disposes when there is no audio track", async () => {
         const dispose = vi.fn();
         await expect(

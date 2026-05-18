@@ -24,6 +24,13 @@ type SinkLike = {
 export type DecodeOptions = {
     onChunk: (chunk: DecodeChunk) => void;
     isAborted?: () => boolean;
+    /**
+     * If set, yields to the event loop (setTimeout(0)) when more than this
+     * many milliseconds have elapsed since the last yield. Use on the main
+     * thread to keep paint/input responsive; leave undefined in workers
+     * where the host thread is dedicated.
+     */
+    yieldEveryMs?: number;
     /** Factory hook for tests. */
     inputFactory?: (source: Source) => InputLike;
     /** Factory hook for tests. */
@@ -53,6 +60,8 @@ export async function decodeWithMediabunny(
     // of frame-router/loudness/sample-stats/waveform-peaks/waveform-band-energy.
     let pool: Float32Array[] = [];
     let outerChannelData: Float32Array[] = [];
+    const yieldEveryMs = opts.yieldEveryMs;
+    let lastYieldAt = yieldEveryMs !== undefined ? performance.now() : 0;
     try {
         const track = await input.getPrimaryAudioTrack();
         if (!track) throw new Error("no audio track");
@@ -87,6 +96,13 @@ export async function decodeWithMediabunny(
                 });
             } finally {
                 sample.close();
+            }
+            if (yieldEveryMs !== undefined) {
+                const now = performance.now();
+                if (now - lastYieldAt >= yieldEveryMs) {
+                    await new Promise<void>((r) => setTimeout(r, 0));
+                    lastYieldAt = performance.now();
+                }
             }
         }
     } finally {

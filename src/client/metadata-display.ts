@@ -1,3 +1,4 @@
+import type { AnalysisWorker } from "./analysis-worker-factory";
 import type { AudioMetadata } from "./metadata";
 import { containerDisplayName } from "./metadata/container-name";
 import { basename, formatSpec } from "./metadata-spec";
@@ -41,7 +42,7 @@ function formatSize(bytes: number): string {
 
 export function createMetadataDisplay(
     rootEl: HTMLElement,
-    worker: Worker,
+    worker: AnalysisWorker,
 ): MetadataDisplay {
     const slots = readSlots(rootEl);
     let current: AudioMetadata | null = null;

@@ -1,3 +1,4 @@
+import type { AnalysisWorker } from "./analysis-worker-factory";
 import {
     PLACEHOLDER,
     formatDb,
@@ -42,7 +43,7 @@ type SampleCells = {
 };
 
 export function createMetrics(
-    worker: Worker,
+    worker: AnalysisWorker,
     seekBarEl: HTMLElement,
     audio: WebAudioPlayer,
 ): Metrics {
