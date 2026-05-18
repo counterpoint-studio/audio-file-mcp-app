@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { instantiate } from "../dsp/wasm-dsp.gen";
+import { instantiate } from "../dsp/dsp-loader";
 import { FFT_SIZE, HOP } from "./frame-router";
 import {
     BAND_EDGES_HZ,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { instantiate, getInstance } from "../dsp/wasm-dsp.gen";
+import { instantiate, getInstance } from "../dsp/dsp-loader";
 import { makeColorLut } from "./spectrogram";
 import { FFT_SIZE, HOP } from "./frame-router";
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { instantiate } from "./wasm-dsp.gen";
+import { instantiate } from "./dsp-loader";
 import { createFft, type Fft } from "./fft";
 
 beforeAll(async () => {

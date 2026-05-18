@@ -8,7 +8,7 @@ import { WaveformBandEnergyAnalyzer } from "./waveform-band-energy";
 import { WaveformPeaksAnalyzer } from "./waveform-peaks";
 import { isMediabunnySupported, type AudioFormat } from "../audio-formats";
 import { shouldApplyFinalDuration } from "./duration-correction";
-import { instantiate as instantiateDsp } from "../dsp/wasm-dsp.gen";
+import { instantiate as instantiateDsp } from "../dsp/dsp-loader";
 import { decodeWithMediabunny } from "./mediabunny-decode";
 import { createChunkStore, type ChunkStore } from "../chunk-store";
 import { createChunkBus, type ChunkBus } from "../chunk-bus";

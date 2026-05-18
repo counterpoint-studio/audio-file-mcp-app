@@ -12,10 +12,14 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
+
+#ifdef __wasm_simd128__
 #include <wasm_simd128.h>
+#endif
 
 #include "render.h"
 
+#ifdef __wasm_simd128__
 // Branchless log10(x) for positive-finite x via IEEE-754 decomposition:
 // log10(x) = log10(2) * (exponent(x) + log2(mantissa)). The mantissa
 // polynomial is a degree-5 least-squares fit on m ∈ [1, 2] with max abs
@@ -48,6 +52,38 @@ static inline v128_t v_log10_ps(v128_t x) {
     v128_t log10_2 = wasm_f32x4_splat(0.30102999566398f);
     return wasm_f32x4_mul(log2x, log10_2);
 }
+#endif
+
+static inline void render_col_scalar(
+    const float* src, int num_bins, int col, int cols,
+    float floor_db, float ceil_db, float ref, float floor_value,
+    float db_mult, float inv_range,
+    const uint8_t* lut, uint8_t* out_rgba, int b_start
+) {
+    const float inv_ref = 1.0f / ref;
+    for (int b = b_start; b < num_bins; b++) {
+        float v = src[b];
+        float db;
+        if (v > floor_value) {
+            db = db_mult * log10f(v * inv_ref);
+        } else {
+            db = floor_db;
+        }
+        if (db < floor_db) db = floor_db;
+        if (db > ceil_db) db = ceil_db;
+        float t = (db - floor_db) * inv_range;
+        int idx = (int)(t * 255.0f + 0.5f);
+        if (idx < 0) idx = 0;
+        if (idx > 255) idx = 255;
+        int y = num_bins - 1 - b;
+        uint8_t* dst = out_rgba + ((size_t)y * (size_t)cols + (size_t)col) * 4;
+        const uint8_t* px = lut + (size_t)idx * 4;
+        dst[0] = px[0];
+        dst[1] = px[1];
+        dst[2] = px[2];
+        dst[3] = px[3];
+    }
+}
 
 void render_kernel(
     const float* grid,
@@ -63,6 +99,8 @@ void render_kernel(
 ) {
     const float range = ceil_db - floor_db;
     const float inv_range = 1.0f / range;
+
+#ifdef __wasm_simd128__
     const float inv_ref = 1.0f / ref;
 
     v128_t v_floor_value = wasm_f32x4_splat(floor_value);
@@ -76,10 +114,12 @@ void render_kernel(
     v128_t v_zero = wasm_f32x4_splat(0.0f);
 
     float scratch[4] __attribute__((aligned(16)));
+#endif
 
     for (int col = 0; col < cols; col++) {
         const float* src = grid + (size_t)col * (size_t)num_bins;
         int b = 0;
+#ifdef __wasm_simd128__
         for (; b + 4 <= num_bins; b += 4) {
             v128_t val = wasm_v128_load(src + b);
             v128_t gated = wasm_f32x4_max(val, v_floor_value);
@@ -110,28 +150,10 @@ void render_kernel(
                 dst[3] = px[3];
             }
         }
-        for (; b < num_bins; b++) {
-            float v = src[b];
-            float db;
-            if (v > floor_value) {
-                db = db_mult * log10f(v * inv_ref);
-            } else {
-                db = floor_db;
-            }
-            if (db < floor_db) db = floor_db;
-            if (db > ceil_db) db = ceil_db;
-            float t = (db - floor_db) * inv_range;
-            int idx = (int)(t * 255.0f + 0.5f);
-            if (idx < 0) idx = 0;
-            if (idx > 255) idx = 255;
-            int y = num_bins - 1 - b;
-            uint8_t* dst = out_rgba + ((size_t)y * (size_t)cols + (size_t)col) * 4;
-            const uint8_t* px = lut + (size_t)idx * 4;
-            dst[0] = px[0];
-            dst[1] = px[1];
-            dst[2] = px[2];
-            dst[3] = px[3];
-        }
+#endif
+        render_col_scalar(src, num_bins, col, cols,
+            floor_db, ceil_db, ref, floor_value, db_mult, inv_range,
+            lut, out_rgba, b);
     }
 }
 

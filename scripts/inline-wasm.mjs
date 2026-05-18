@@ -2,8 +2,9 @@
 // Post-process Emscripten output into a single .ts module:
 //   - reads the .wasm binary, base64-encodes it
 //   - reads the .mjs ES-module factory glue
-//   - emits a TS module that exports `instantiate()` returning the typed module,
-//     supplying `wasmBinary` so the factory never tries to fetch/fs the binary.
+//   - emits a TS module that exports `createWasmDsp` (the factory) and
+//     `getWasmBinary()` (returns the decoded `.wasm` bytes). Instantiation
+//     + backend selection live in src/client/dsp/dsp-loader.ts.
 //
 // Usage: node inline-wasm.mjs <wasm-path> <mjs-path> <out-ts-path>
 
@@ -56,26 +57,10 @@ function decodeWasmBase64(b64) {
 `;
 
 const footer = `
-let _instance = null;
+export { createWasmDsp };
 
-export async function instantiate() {
-    if (_instance) return _instance;
-    _instance = await createWasmDsp({
-        wasmBinary: decodeWasmBase64(WASM_BASE64),
-        locateFile: (path) => path,
-    });
-    return _instance;
-}
-
-export function getInstance() {
-    if (!_instance) {
-        throw new Error("wasm-dsp not instantiated — await instantiate() first");
-    }
-    return _instance;
-}
-
-export function __resetForTests() {
-    _instance = null;
+export function getWasmBinary() {
+    return decodeWasmBase64(WASM_BASE64);
 }
 `;
 

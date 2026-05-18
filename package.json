@@ -12,6 +12,8 @@
   "scripts": {
     "build": "INPUT=mcp-app.html vite build",
     "build:wasm": "scripts/build-wasm.sh",
+    "build:js-dsp": "scripts/build-js-dsp.sh",
+    "build:dsp": "scripts/build-wasm.sh && scripts/build-js-dsp.sh",
     "serve": "npx tsx src/server/app.ts",
     "test": "vitest run",
     "typecheck": "tsc -b"

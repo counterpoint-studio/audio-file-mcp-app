@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { instantiate } from "./wasm-dsp.gen";
+import { instantiate } from "./dsp-loader";
 import { createGridRenderer } from "./render-grid";
 
 beforeAll(async () => {

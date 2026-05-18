@@ -1,4 +1,4 @@
-import { getInstance, instantiate } from "./wasm-dsp.gen";
+import { getInstance, instantiate } from "./dsp-loader";
 
 type WasmModule = {
     HEAPF32: Float32Array;

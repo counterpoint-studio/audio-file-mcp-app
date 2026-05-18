@@ -1,4 +1,4 @@
-import { getInstance, instantiate } from "../dsp/wasm-dsp.gen";
+import { getInstance, instantiate } from "../dsp/dsp-loader";
 import type { Analyzer, AnalyzerChunk } from "./analyzer";
 import { FFT_SIZE, HOP, type FrameConsumer } from "./frame-router";
 import {
