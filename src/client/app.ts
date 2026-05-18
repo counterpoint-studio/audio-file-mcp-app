@@ -120,7 +120,7 @@ app.ontoolresult = async (result) => {
     }
 
     if (init.sizeBytes === undefined) {
-        console.warn("display-audio-file result missing sizeBytes; cannot load");
+        console.warn("display_audio_file result missing sizeBytes; cannot load");
         showError("decode-failed", "missing file size from server");
         return;
     }

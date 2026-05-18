@@ -29,7 +29,7 @@ let callSeq = 0;
 
 registerAppTool(
   server,
-  "display-audio-file",
+  "display_audio_file",
   {
     title: "Display audio file",
     description: "Display a UI for an audio file, providing the user with playback, metadata, and statistics. Use when the user specifically asks to hear or see an audio file, or when otherwise clear from context that one would be helpful.",
