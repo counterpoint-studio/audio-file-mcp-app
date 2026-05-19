@@ -4,16 +4,40 @@
   "description": "An MCP app for inspecting audio files in audio workflows. Playback, metadata, statistics",
   "keywords": [
     "audio",
-    "mcp"
+    "mcp",
+    "mcp-app",
+    "mcp-server",
+    "model-context-protocol"
   ],
   "license": "ISC",
   "author": "Tero Parviainen <tero@teropa.info>",
+  "homepage": "https://github.com/counterpoint-studio/audio-file-mcp-app#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/counterpoint-studio/audio-file-mcp-app.git"
+  },
+  "bugs": "https://github.com/counterpoint-studio/audio-file-mcp-app/issues",
   "type": "module",
+  "bin": {
+    "audio-file-mcp-app": "dist/server/app.js"
+  },
+  "files": [
+    "dist/server",
+    "dist/mcp-app.html",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "INPUT=mcp-app.html vite build",
     "build:wasm": "scripts/build-wasm.sh",
     "build:js-dsp": "scripts/build-js-dsp.sh",
     "build:dsp": "scripts/build-wasm.sh && scripts/build-js-dsp.sh",
+    "build:server": "tsc -p tsconfig.server-build.json && node scripts/add-shebang.mjs",
+    "build:dist": "pnpm run build && pnpm run build:server",
+    "prepublishOnly": "pnpm run build:dsp && pnpm run build:dist",
     "serve": "npx tsx src/server/app.ts",
     "test": "vitest run",
     "typecheck": "tsc -b"
