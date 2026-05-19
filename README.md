@@ -54,7 +54,7 @@ Or add the server by hand to `claude_desktop_config.json`:
 
 ### VS Code (Copilot, Agent mode)
 
-[![Install in VS Code](https://img.shields.io/badge/Install%20in-VS%20Code-007ACC?logo=visualstudiocode&logoColor=white)](vscode:mcp/install?%7B%22name%22%3A%22audio-file%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40counterpoint-studio%2Faudio-file-mcp-app%22%5D%7D)
+[![Install in VS Code](https://img.shields.io/badge/Install%20in-VS%20Code-007ACC?logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=audio-file&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40counterpoint-studio%2Faudio-file-mcp-app%22%5D%7D)
 
 Or add to `.vscode/mcp.json` (workspace) or your user `mcp.json`:
 
@@ -72,7 +72,12 @@ Or add to `.vscode/mcp.json` (workspace) or your user `mcp.json`:
 
 ### Goose
 
-[![Install in Goose](https://img.shields.io/badge/Install%20in-Goose-1F1F1F?logo=goose&logoColor=white)](goose://extension?id=audio-file&name=Audio%20File%20MCP%20App&cmd=npx&arg=-y&arg=%40counterpoint-studio%2Faudio-file-mcp-app)
+Paste this deep link into your browser (Goose Desktop must be installed; the
+custom URI scheme can't be a real link in a GitHub README):
+
+```
+goose://extension?id=audio-file&name=Audio%20File%20MCP%20App&cmd=npx&arg=-y&arg=%40counterpoint-studio%2Faudio-file-mcp-app
+```
 
 Or run `goose configure` → **Add Extension** → **Command-line Extension** and
 enter `npx -y @counterpoint-studio/audio-file-mcp-app`.
