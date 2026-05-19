@@ -37,6 +37,8 @@
     "build:dsp": "scripts/build-wasm.sh && scripts/build-js-dsp.sh",
     "build:server": "tsc -p tsconfig.server-build.json && node scripts/add-shebang.mjs",
     "build:dist": "pnpm run build && pnpm run build:server",
+    "build:mcpb": "node scripts/build-mcpb.mjs",
+    "clean:mcpb": "rm -rf build/mcpb dist/*.mcpb",
     "prepublishOnly": "pnpm run build:dsp && pnpm run build:dist",
     "serve": "npx tsx src/server/app.ts",
     "test": "vitest run",
@@ -50,6 +52,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
     "@types/node": "^25.6.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",

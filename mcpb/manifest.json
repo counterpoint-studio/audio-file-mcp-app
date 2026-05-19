@@ -1,0 +1,40 @@
+{
+  "manifest_version": "0.3",
+  "name": "audio-file-mcp-app",
+  "display_name": "Audio File MCP App",
+  "version": "1.0.0",
+  "description": "Inspect local audio files — playback, metadata, loudness, spectrogram.",
+  "author": {
+    "name": "Counterpoint Studio OÜ",
+    "email": "tero@teropa.info",
+    "url": "https://github.com/counterpoint-studio"
+  },
+  "homepage": "https://github.com/counterpoint-studio/audio-file-mcp-app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/counterpoint-studio/audio-file-mcp-app"
+  },
+  "license": "ISC",
+  "keywords": ["audio", "mcp", "audio-analysis"],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/server/app.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/server/app.js"]
+    }
+  },
+  "tools": [
+    {
+      "name": "display_audio_file",
+      "description": "Display a UI for an audio file, providing the user with playback, metadata, and statistics."
+    }
+  ],
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  }
+}
