@@ -3,7 +3,7 @@
   "name": "io.github.counterpoint-studio/audio-file-mcp-app",
   "title": "Audio File MCP App",
   "description": "Inspect local audio files — playback, metadata, loudness, spectrogram.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "repository": {
     "url": "https://github.com/counterpoint-studio/audio-file-mcp-app",
     "source": "github"
@@ -13,7 +13,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@counterpoint-studio/audio-file-mcp-app",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" }
     }
