@@ -3,6 +3,8 @@
 An [MCP App](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/)
 for playing and inspecting local audio files in an MCP host.
 
+![Audio File MCP App running in Claude Desktop](https://raw.githubusercontent.com/counterpoint-studio/audio-file-mcp-app/main/docs/screenshot.png)
+
 Renders an in-conversation UI with playback, metadata, loudness, and a
 spectrogram.
 
