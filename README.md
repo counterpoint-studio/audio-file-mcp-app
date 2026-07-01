@@ -104,13 +104,11 @@ with waveform, spectrogram, loudness metrics, and playback transport.
 
 Tested and known to work in:
 
-- **Claude Desktop** — Chat and Cowork
+- **Claude Desktop** — Chat, Cowork, and Code
+- **Codex Desktop**
 - **Visual Studio Code**
 - **Goose**
 - **MCP Inspector**
-
-The Codex app has been tested too, but
-[its MCP App support is currently broken](https://github.com/openai/codex/issues/21019).
 
 ## Development
 
