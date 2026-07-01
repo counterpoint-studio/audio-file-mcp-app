@@ -54,6 +54,15 @@ Or add the server by hand to `claude_desktop_config.json`:
 }
 ```
 
+### Codex Desktop
+
+1. Go to Settings -> MCP Servers
+2. Add Server
+3. Name: `audiofile-mcp-app`
+4. Command to launch: `npx`
+5. Arguments `-y` and `@counterpoint-studio/audio-file-mcp-app`
+
+
 ### VS Code (Copilot, Agent mode)
 
 [![Install in VS Code](https://img.shields.io/badge/Install%20in-VS%20Code-007ACC?logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=audio-file&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40counterpoint-studio%2Faudio-file-mcp-app%22%5D%7D)
