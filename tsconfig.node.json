@@ -11,5 +11,5 @@
     "noEmit": true,
     "composite": true
   },
-  "include": ["src/server/**/*.ts", "vite.config.ts"]
+  "include": ["src/server/**/*.ts", "src/shared/**/*.ts", "vite.config.ts"]
 }

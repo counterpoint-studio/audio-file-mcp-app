@@ -3,13 +3,13 @@
   "compilerOptions": {
     "noEmit": false,
     "composite": false,
-    "outDir": "dist/server",
-    "rootDir": "src/server",
+    "outDir": "dist",
+    "rootDir": "src",
     "declaration": false,
     "sourceMap": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext"
   },
-  "include": ["src/server/**/*.ts"],
-  "exclude": ["src/server/**/*.test.ts"]
+  "include": ["src/server/**/*.ts", "src/shared/**/*.ts"],
+  "exclude": ["src/server/**/*.test.ts", "src/shared/**/*.test.ts"]
 }

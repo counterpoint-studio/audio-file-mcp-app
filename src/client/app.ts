@@ -32,6 +32,7 @@ const seekBarEl = document.querySelector("#seek-bar") as HTMLElement;
 const positionEl = document.querySelector("#position") as HTMLElement;
 const durationEl = document.querySelector("#duration") as HTMLElement;
 const spectrogramWrapEl = document.querySelector("#spectrogram-wrap") as HTMLElement;
+const annotationBandEl = document.querySelector("#annotation-band") as HTMLElement;
 const headerEl = document.querySelector("#top") as HTMLElement;
 const statsEl = document.querySelector("#stats") as HTMLElement;
 const errorBannerEl = document.querySelector("#error-banner") as HTMLElement;
@@ -183,6 +184,8 @@ app.ontoolresult = async (result) => {
             positionEl,
             durationEl,
             spectrogramWrapEl,
+            annotationBandEl,
+            init.annotations ?? null,
             durationSeconds,
             durationExact,
             {

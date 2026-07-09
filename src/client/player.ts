@@ -1,5 +1,7 @@
 import type { Source } from "mediabunny";
 import type { AnalysisWorker } from "./analysis-worker-factory";
+import { createAnnotationBand } from "./annotation-band";
+import type { AnnotationData } from "../shared/annotation-data";
 import { type AudioFormat } from "./audio-formats";
 import { createLoopRegion, type LoopRegion, type RegionObserver } from "./loop-region";
 import { createMetrics, type LiveMetrics, type Metrics } from "./metrics";
@@ -53,6 +55,8 @@ export async function createPlayer(
     positionEl: HTMLElement,
     durationEl: HTMLElement,
     spectrogramWrapEl: HTMLElement,
+    annotationBandEl: HTMLElement,
+    annotations: AnnotationData | null,
     durationSeconds: number | null,
     durationExact: boolean,
     observer?: PlayerObserver,
@@ -94,6 +98,20 @@ export async function createPlayer(
     );
     const metrics: Metrics = createMetrics(waveform.worker, seekBarEl, audio);
     const spectrogram: Spectrogram = createSpectrogram(waveform.worker, spectrogramWrapEl);
+
+    // Static SVG lanes between waveform and spectrogram, keyed to the audio's
+    // own duration so spans align with the playhead. Duration may not be known
+    // yet; refine it from `loadedmetadata`.
+    const annotationBand = createAnnotationBand(
+        annotationBandEl,
+        annotations,
+        durationSeconds ?? 0,
+    );
+    const onLoadedMetadata = () => annotationBand.setDuration(audio.duration);
+    if (audio.readyState >= 1 && Number.isFinite(audio.duration)) {
+        annotationBand.setDuration(audio.duration);
+    }
+    audio.addEventListener("loadedmetadata", onLoadedMetadata);
 
     const onClick = () => {
         if (audio.paused) {
@@ -203,6 +221,7 @@ export async function createPlayer(
                 waveform.worker.removeEventListener("message", onWorkerMessage);
             }
             spectrogram.destroy();
+            annotationBand.destroy();
             metrics.destroy();
             waveform.destroy();
             loopRegion.destroy();
@@ -212,6 +231,7 @@ export async function createPlayer(
             audio.removeEventListener("play", onPlay);
             audio.removeEventListener("pause", onPause);
             audio.removeEventListener("timeupdate", onTimeUpdate);
+            audio.removeEventListener("loadedmetadata", onLoadedMetadata);
             audio.removeEventListener("error", onAudioError);
             audio.pause();
             audio.destroy();

@@ -104,6 +104,34 @@ describe("parseDisplayAudioInit", () => {
         expect(init?.sizeBytes).toBeUndefined();
     });
 
+    it("parses valid annotations from structuredContent", () => {
+        const init = parseDisplayAudioInit({
+            structuredContent: {
+                path: "/a.wav",
+                annotations: {
+                    lanes: [{ label: "Pad", spans: [{ start: 0, end: 5 }] }],
+                },
+            },
+        });
+        expect(init?.annotations).toEqual({
+            lanes: [{ label: "Pad", spans: [{ start: 0, end: 5 }] }],
+        });
+    });
+
+    it("drops invalid annotations", () => {
+        const init = parseDisplayAudioInit({
+            structuredContent: { path: "/a.wav", annotations: { lanes: 5 } },
+        });
+        expect(init?.annotations).toBeUndefined();
+    });
+
+    it("leaves annotations undefined when absent", () => {
+        const init = parseDisplayAudioInit({
+            structuredContent: { path: "/a.wav" },
+        });
+        expect(init?.annotations).toBeUndefined();
+    });
+
     it("returns null when no path can be found", () => {
         expect(parseDisplayAudioInit({})).toBeNull();
         expect(parseDisplayAudioInit({ content: [] })).toBeNull();

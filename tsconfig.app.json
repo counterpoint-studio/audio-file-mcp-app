@@ -10,6 +10,6 @@
     "noEmit": true,
     "composite": true
   },
-  "include": ["src/client/**/*.ts"],
+  "include": ["src/client/**/*.ts", "src/shared/**/*.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/__fixtures__/**"]
 }

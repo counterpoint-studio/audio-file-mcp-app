@@ -24,6 +24,7 @@
   },
   "files": [
     "dist/server",
+    "dist/shared",
     "dist/mcp-app.html",
     "README.md",
     "LICENSE"

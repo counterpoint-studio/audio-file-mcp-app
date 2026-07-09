@@ -12,6 +12,8 @@ import path from "node:path";
 import * as z from "zod";
 import { normalizeIncomingPath } from "./path-utils.js";
 import { asScalar, parseNonNegInt } from "./range-params.js";
+import { annotationDataSchema } from "../shared/annotation-data.js";
+import { resolveAnnotations } from "./resolve-annotations.js";
 
 const server = new McpServer({
   name: "Audio File MCP App",
@@ -50,10 +52,26 @@ registerAppTool(
         .describe(
           "Optional initial selected/highlighted region in seconds (decimal)",
         ),
+      annotations: annotationDataSchema
+        .optional()
+        .describe(
+          "Optional annotation lanes drawn between the waveform and spectrogram. " +
+            "Each lane has an optional label, optional CSS color, spans [{start,end}] " +
+            "in seconds, and an optional envelope ([{time,value}] with value 0..1) that " +
+            "fades span opacity. Times are in seconds on the audio's own timeline.",
+        ),
+      annotationsPath: z
+        .string()
+        .optional()
+        .describe(
+          "Absolute path to a JSON file containing the same { lanes: [...] } structure " +
+            "as `annotations`. Use instead of `annotations` for large payloads. Ignored if " +
+            "`annotations` is also given.",
+        ),
     }),
     _meta: { ui: { resourceUri } },
   },
-  async ({ path, playheadSeconds, region }) => {
+  async ({ path, playheadSeconds, region, annotations, annotationsPath }) => {
     const normalized = normalizeIncomingPath(path);
     if (!normalized) {
       throw new Error("Path parameter is required");
@@ -73,6 +91,13 @@ registerAppTool(
     }
     if (region !== undefined && region.endSeconds > region.startSeconds) {
       structuredContent.region = region;
+    }
+    const resolvedAnnotations = await resolveAnnotations(
+      { annotations, annotationsPath },
+      (p) => fs.readFile(p, "utf-8"),
+    );
+    if (resolvedAnnotations) {
+      structuredContent.annotations = resolvedAnnotations;
     }
     return {
       content: [{ type: "text", text: normalized }],

@@ -1,8 +1,11 @@
+import { parseAnnotationData, type AnnotationData } from "../shared/annotation-data";
+
 export type DisplayAudioInit = {
     path: string;
     sizeBytes?: number;
     playheadSeconds?: number;
     region?: { startSeconds: number; endSeconds: number };
+    annotations?: AnnotationData;
 };
 
 type ToolResultLike = {
@@ -50,6 +53,11 @@ export function parseDisplayAudioInit(
         ) {
             init.region = { startSeconds: a, endSeconds: b };
         }
+    }
+
+    const annotations = parseAnnotationData(sc.annotations);
+    if (annotations) {
+        init.annotations = annotations;
     }
 
     return init;

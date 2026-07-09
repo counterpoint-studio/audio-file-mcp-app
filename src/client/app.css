@@ -13,6 +13,11 @@
     --seek-bg: var(--color-background-secondary, #ececec);
     --accent: #e6007e;
     --spectrogram-h: 60px;
+    --annotation-row-h: 7.5px;
+    /* Height of the annotation band. `--annotation-lanes` is set on :root by the
+       renderer (0 when there are no annotations), so this resolves to 0 and the
+       layout is byte-for-byte unchanged when no annotations are supplied. */
+    --annotations-h: calc(var(--annotation-lanes, 0) * var(--annotation-row-h));
 }
 
 html,
@@ -35,9 +40,10 @@ body {
 
 body {
     /* Inline-mode layout: fills the iframe horizontally and reports a fixed
-       height back to the host via the SDK's autoResize. */
+       height back to the host via the SDK's autoResize. Grows by the annotation
+       band height (0 when no annotations are present). */
     width: 100%;
-    height: 240px;
+    height: calc(240px + var(--annotations-h));
     box-sizing: border-box;
     overflow: hidden;
     display: flex;
@@ -245,9 +251,53 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: calc(100% - var(--spectrogram-h));
+    height: calc(100% - var(--spectrogram-h) - var(--annotations-h));
     pointer-events: none;
     display: block;
+}
+
+#annotation-band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: var(--spectrogram-h);
+    height: var(--annotations-h);
+    /* Light-accent fill for lanes that don't specify their own color. */
+    --annotation-fill: color-mix(in srgb, var(--accent) 100%, white 25%);
+    z-index: 1;
+}
+
+#annotation-band[hidden] {
+    display: none;
+}
+
+#annotation-band .annotation-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+#annotation-band .annotation-label {
+    position: absolute;
+    /* Float above the band so the label clears the cursor, which sits over the
+       lanes. */
+    bottom: calc(100% + 4px);
+    z-index: 3;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--seek-bg) 85%, var(--ink) 0%);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    font-size: var(--fs-xs);
+    white-space: nowrap;
+    pointer-events: none;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#annotation-band .annotation-label[hidden] {
+    display: none;
 }
 
 #spectrogram-wrap {
