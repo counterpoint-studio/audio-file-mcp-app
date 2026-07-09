@@ -5,12 +5,13 @@ for playing and inspecting local audio files in an MCP host.
 
 ![Audio File MCP App running in Claude Desktop](https://raw.githubusercontent.com/counterpoint-studio/audio-file-mcp-app/main/docs/screenshot.png)
 
-Renders an in-conversation UI with playback, metadata, loudness, and a
-spectrogram.
+Renders an in-conversation UI with playback, metadata, loudness, a
+spectrogram, and an optional annotation-lane timeline.
 
-File metadata, loudness statistics, the current playhead
-position, and any selected region are also exposed back to the model, so
-follow-up tasks can refer to what the user is actually hearing and looking at.
+File metadata, loudness statistics, the current playhead position, any
+selected region, and the annotation lanes active at the playhead are also
+exposed back to the model, so follow-up tasks can refer to what the user is
+actually hearing and looking at.
 
 ## Features
 
@@ -28,6 +29,13 @@ follow-up tasks can refer to what the user is actually hearing and looking at.
 - **Looping region selection.** Drag on the timeline to mark a region;
   playback loops over it, and the region's start/end are passed back to
   the model alongside the file's loudness and playhead state.
+- **Annotation-lane timeline.** Supply timeline annotations and the widget
+  draws a stack of thin labelled lanes between the waveform and spectrogram,
+  aligned to the audio's own timeline. Each lane carries time spans, an
+  optional colour, and an optional envelope that fades span opacity along the
+  lane. Hovering a span reveals its label, and the lanes active at the
+  playhead — plus those starting, ending, or active within a selected region
+  — are reported back to the model.
 
 ## Install
 
@@ -108,6 +116,37 @@ example:
 
 The host calls the `display_audio_file` tool, which renders the in-app UI
 with waveform, spectrogram, loudness metrics, and playback transport.
+
+### Annotation lanes
+
+`display_audio_file` accepts an optional `annotations` object describing lanes
+to draw on the timeline (or an `annotationsPath` pointing at a JSON file with
+the same `{ "lanes": [...] }` shape — handy for large payloads):
+
+```json
+{
+  "annotations": {
+    "lanes": [
+      {
+        "label": "Delay tails",
+        "color": "#e6007e",
+        "spans": [{ "start": 8, "end": 24 }],
+        "envelope": [
+          { "time": 8, "value": 0 },
+          { "time": 24, "value": 1 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Times are in seconds on the audio's own timeline. `label`, `color`, and
+`envelope` are optional; a lane with an envelope fades its span opacity along
+the envelope curve, and uncoloured lanes use a light-accent fill. Overlapping
+spans in a lane are truncated at the next span's start so rows never overlap.
+The model can author annotations to point out sections, mark events, or
+visualise an analysis it just ran.
 
 ## Client compatibility
 
