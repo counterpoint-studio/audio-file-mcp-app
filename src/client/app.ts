@@ -170,6 +170,7 @@ app.ontoolresult = async (result) => {
         publisher.setFile(filePath);
         publisher.setMetadata(metadata);
         publisher.setDurationSeconds(durationSeconds);
+        publisher.setAnnotations(init.annotations ?? null);
         publisher.setPlayback("paused");
         publisher.setPosition(0, null);
 

@@ -6,6 +6,7 @@ import {
     type PositionSamples,
 } from "./model-context-text";
 import type { AudioMetadata } from "./metadata";
+import type { AnnotationData } from "../shared/annotation-data";
 import {
     createThrottledPublisher,
     type ThrottledPublisher,
@@ -23,6 +24,7 @@ export type AudioContextPublisher = {
     setRegionPreview(startSec: number, endSec: number): void;
     setRegion(startSec: number, endSec: number): void;
     clearRegion(): void;
+    setAnnotations(a: AnnotationData | null): void;
     setError(kind: DecodeErrorKind, message?: string): void;
     clearError(): void;
     destroy(): void;
@@ -133,6 +135,11 @@ export function createAudioContextPublisher(
         clearRegion(): void {
             if (guard()) return;
             state.region = null;
+            publisher.publish(true);
+        },
+        setAnnotations(a: AnnotationData | null): void {
+            if (guard()) return;
+            state.annotations = a;
             publisher.publish(true);
         },
         setError(kind: DecodeErrorKind, message?: string): void {

@@ -241,6 +241,94 @@ describe("buildContextMarkdown", () => {
         );
     });
 
+    it("reports active lanes at the playhead when inside a span", () => {
+        const state: ContextState = {
+            ...emptyContextState(),
+            path: "/x.wav",
+            metadata: { container: "wav", sizeBytes: 100 },
+            positionSeconds: 2,
+            annotations: {
+                lanes: [
+                    { label: "Warm Pad", spans: [{ start: 0, end: 5 }] },
+                    { label: "Drone", spans: [{ start: 10, end: 20 }] },
+                ],
+            },
+        };
+        const out = buildContextMarkdown(state);
+        expect(out).toContain("active-lanes: Warm Pad");
+        expect(out).not.toContain("Drone");
+        expect(out).toContain(
+            "Active annotation lanes at the playhead: Warm Pad.",
+        );
+    });
+
+    it("omits active-lanes when the playhead is outside every span", () => {
+        const state: ContextState = {
+            ...emptyContextState(),
+            path: "/x.wav",
+            metadata: { container: "wav", sizeBytes: 100 },
+            positionSeconds: 8,
+            annotations: {
+                lanes: [{ label: "Warm Pad", spans: [{ start: 0, end: 5 }] }],
+            },
+        };
+        const out = buildContextMarkdown(state);
+        expect(out).not.toContain("active-lanes:");
+        expect(out).not.toContain("Active annotation lanes");
+    });
+
+    it("reports starting/ending/active lanes within a region", () => {
+        const state: ContextState = {
+            ...emptyContextState(),
+            path: "/x.wav",
+            metadata: { container: "wav", sizeBytes: 100 },
+            positionSeconds: 0,
+            region: { startSeconds: 4, endSeconds: 16 },
+            annotations: {
+                lanes: [
+                    { label: "A", spans: [{ start: 0, end: 10 }] },
+                    { label: "B", spans: [{ start: 10, end: 20 }] },
+                ],
+            },
+        };
+        const out = buildContextMarkdown(state);
+        expect(out).toContain("region-active-lanes: A, B");
+        expect(out).toContain("region-lanes-starting: B");
+        expect(out).toContain("region-lanes-ending: A");
+        expect(out).toContain("Within the selected region, B start and A end.");
+    });
+
+    it("falls back to `lane N` for unlabeled lanes", () => {
+        const state: ContextState = {
+            ...emptyContextState(),
+            path: "/x.wav",
+            metadata: { container: "wav", sizeBytes: 100 },
+            positionSeconds: 1,
+            annotations: {
+                lanes: [{ spans: [{ start: 0, end: 5 }] }],
+            },
+        };
+        const out = buildContextMarkdown(state);
+        expect(out).toContain("active-lanes: lane 1");
+        expect(out).toContain(
+            "Active annotation lanes at the playhead: lane 1.",
+        );
+    });
+
+    it("emits no annotation output when annotations are null", () => {
+        const state: ContextState = {
+            ...emptyContextState(),
+            path: "/x.wav",
+            metadata: { container: "wav", sizeBytes: 100 },
+            region: { startSeconds: 1, endSeconds: 2 },
+        };
+        const out = buildContextMarkdown(state);
+        expect(out).not.toContain("active-lanes");
+        expect(out).not.toContain("region-active-lanes");
+        expect(out).not.toContain("region-lanes-");
+        expect(out).not.toContain("annotation lanes");
+    });
+
     it("distinguishes playing vs paused", () => {
         const base: ContextState = {
             ...emptyContextState(),

@@ -1,6 +1,8 @@
 import type { AudioMetadata } from "./metadata";
 import { containerDisplayName } from "./metadata/container-name";
 import { basename } from "./metadata-spec";
+import type { AnnotationData } from "../shared/annotation-data";
+import { activeLaneIndicesAt, laneActivityInRegion } from "./annotation-layout";
 
 export type GlobalMetrics = {
     /** linear, 0..1+ */
@@ -40,6 +42,7 @@ export type ContextState = {
     positionSeconds: number;
     positionSamples: PositionSamples | null;
     region: { startSeconds: number; endSeconds: number } | null;
+    annotations: AnnotationData | null;
     error: DecodeError | null;
 };
 
@@ -54,6 +57,7 @@ export function emptyContextState(): ContextState {
         positionSeconds: 0,
         positionSamples: null,
         region: null,
+        annotations: null,
         error: null,
     };
 }
@@ -147,9 +151,24 @@ export function buildContextMarkdown(state: ContextState): string {
         pushDb(lines, "position-rms-db", linearToDb(state.positionSamples.rms));
     }
 
+    if (state.annotations) {
+        const active = activeLaneIndicesAt(state.annotations, state.positionSeconds);
+        pushLaneList(lines, "active-lanes", state.annotations, active);
+    }
+
     if (state.region) {
         pushIfFiniteSeconds(lines, "region-start-seconds", state.region.startSeconds);
         pushIfFiniteSeconds(lines, "region-end-seconds", state.region.endSeconds);
+        if (state.annotations) {
+            const { active, starting, ending } = laneActivityInRegion(
+                state.annotations,
+                state.region.startSeconds,
+                state.region.endSeconds,
+            );
+            pushLaneList(lines, "region-active-lanes", state.annotations, active);
+            pushLaneList(lines, "region-lanes-starting", state.annotations, starting);
+            pushLaneList(lines, "region-lanes-ending", state.annotations, ending);
+        }
     }
 
     if (state.error) {
@@ -199,11 +218,55 @@ function buildNarrative(
         sentences.push(`A region from ${a} s to ${b} s is selected.`);
     }
 
+    if (state.annotations) {
+        const active = activeLaneIndicesAt(state.annotations, state.positionSeconds);
+        if (active.length > 0) {
+            sentences.push(
+                `Active annotation lanes at the playhead: ${laneNames(
+                    state.annotations,
+                    active,
+                ).join(", ")}.`,
+            );
+        }
+        if (state.region) {
+            const { starting, ending } = laneActivityInRegion(
+                state.annotations,
+                state.region.startSeconds,
+                state.region.endSeconds,
+            );
+            const parts: string[] = [];
+            if (starting.length > 0) {
+                parts.push(`${laneNames(state.annotations, starting).join(", ")} start`);
+            }
+            if (ending.length > 0) {
+                parts.push(`${laneNames(state.annotations, ending).join(", ")} end`);
+            }
+            if (parts.length > 0) {
+                sentences.push(`Within the selected region, ${parts.join(" and ")}.`);
+            }
+        }
+    }
+
     if (state.error) {
         sentences.push(errorSentence(state.error));
     }
 
     return sentences.join(" ");
+}
+
+// A lane's display name is its label, or a 1-based `lane N` fallback.
+function laneNames(annotations: AnnotationData, indices: number[]): string[] {
+    return indices.map((i) => annotations.lanes[i]?.label ?? `lane ${i + 1}`);
+}
+
+function pushLaneList(
+    lines: string[],
+    key: string,
+    annotations: AnnotationData,
+    indices: number[],
+): void {
+    if (indices.length === 0) return;
+    lines.push(`${key}: ${laneNames(annotations, indices).join(", ")}`);
 }
 
 function errorSentence(error: DecodeError): string {
