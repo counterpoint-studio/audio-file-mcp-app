@@ -1,7 +1,7 @@
 {
   "name": "@counterpoint-studio/audio-file-mcp-app",
   "mcpName": "io.github.counterpoint-studio/audio-file-mcp-app",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "An MCP app for inspecting audio files in audio workflows. Playback, metadata, statistics",
   "keywords": [
     "audio",

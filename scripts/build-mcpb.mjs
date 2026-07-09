@@ -37,6 +37,9 @@ await cp(resolve(repoRoot, "mcpb/manifest.json"), resolve(stageDir, "manifest.js
 await cp(resolve(distDir, "server"), resolve(stageDir, "dist/server"), {
   recursive: true,
 });
+await cp(resolve(distDir, "shared"), resolve(stageDir, "dist/shared"), {
+  recursive: true,
+});
 await cp(resolve(distDir, "mcp-app.html"), resolve(stageDir, "dist/mcp-app.html"));
 
 const stagedPkg = {
