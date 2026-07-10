@@ -173,18 +173,18 @@ pnpm test
 ## Releasing
 
 ```bash
-pnpm version <bump>                                 # bumps package.json + tags
-pnpm publish --access public                        # publishes to npm
-pnpm run build:mcpb                                 # produces dist/audio-file-mcp-app-<version>.mcpb
-gh release create v<version> dist/*.mcpb           # attaches the bundle to a GitHub release
-mcp-publisher login github && mcp-publisher publish # updates the MCP Registry listing
+pnpm version <bump>          # bumps every version string (package.json, server.json,
+                             # mcpb/manifest.json, src/server/app.ts) + commits + tags
+pnpm publish --access public # publishes to npm, then the MCP Registry (postpublish)
+pnpm run build:mcpb          # produces dist/audio-file-mcp-app-<version>.mcpb
+gh release create v<version> dist/*.mcpb # attaches the bundle to a GitHub release
 ```
 
-`mcp-publisher` is a Go binary; install it via
-`brew install mcp-publisher` or per the
-[registry quickstart](https://modelcontextprotocol.io/registry/quickstart).
-It reads `server.json` from the repo root — keep its `version` in sync with
-`package.json` before publishing.
+The MCP Registry step runs `mcp-publisher publish` automatically after
+`pnpm publish`. It needs a valid login — if it fails with an auth error, run
+`mcp-publisher login github` and then `mcp-publisher publish` by hand.
+`mcp-publisher` is a Go binary; install it via `brew install mcp-publisher`
+or per the [registry quickstart](https://modelcontextprotocol.io/registry/quickstart).
 
 ## License
 

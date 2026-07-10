@@ -42,6 +42,8 @@
     "build:mcpb": "node scripts/build-mcpb.mjs",
     "clean:mcpb": "rm -rf build/mcpb dist/*.mcpb",
     "prepublishOnly": "pnpm run build:dsp && pnpm run build:dist",
+    "version": "node scripts/sync-versions.mjs && git add server.json mcpb/manifest.json src/server/app.ts",
+    "postpublish": "mcp-publisher publish",
     "serve": "npx tsx src/server/app.ts",
     "test": "vitest run",
     "typecheck": "tsc -b"
